@@ -2,13 +2,13 @@ from flask import Flask
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
 
-from ..db import models
+from ..db import conn, models
 from .. import config
 
 import traceback
 
 def init_admin():
-    db_sessionmaker = models.get_db_sessionmaker()
+    db_sessionmaker = conn.get_db_sessionmaker()
     db_session = db_sessionmaker()
 
     app = Flask(__name__)

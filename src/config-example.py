@@ -13,4 +13,4 @@ NEXUDUS_EMAIL = "email@example.com"
 NEXUDUS_PASS = "password"
 
 #Generate using urandom
-FLASK_SECRET = b'\x00\x00\x00\x00\x00\x00'
+FLASK_SECRET = b'\x00\x00\x00'
