@@ -18,6 +18,8 @@ def init_admin():
     app.config['PROPAGATE_EXCEPTIONS'] = True
     admin = Admin(app, url='/', name='Beauty Shoppe ACH Administration', template_mode='bootstrap3')
     admin.add_view(ModelView(models.Member, db_session))
+    admin.add_view(ModelView(models.Invoice, db_session))
+    admin.add_view(ModelView(models.Log, db_session))
 
     @app.errorhandler(500)
     def serverError(error):
