@@ -17,7 +17,7 @@
 version: "2.1"
 services:
     app:
-        build: ./
+        build: .
         links:
             - db
         depends_on:
@@ -27,8 +27,10 @@ services:
             - "5000:5000"
     db:
         env_file:
-            - ./.env
+            - .env
         image: mysql:5.7
+        volumes:
+            - ./db:/docker-entrypoint-initdb.d
         ports:
             - "32000:3306"
         healthcheck:

@@ -39,7 +39,7 @@ class Invoice(Base):
     __tablename__ = 'invoice'
     id = Column(Integer, primary_key=True)
     nexudus_id = Column(Integer)
-    timecreated = Column(Integer)
+    time_created = Column(Integer)
     amount = Column(Integer)
     processed = Column(Boolean)
     txn_id = Column(BigInteger)
@@ -52,3 +52,4 @@ class Log(Base):
     log_message = Column(Text)
     invoice_id = Column(Integer, ForeignKey("invoice.id"))
     invoice = relationship("Invoice")
+    time_created = Column(Integer)

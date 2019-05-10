@@ -1,7 +1,10 @@
 # Sensitive data
 src/config.py
-alembic.ini
 .env
+
+# Alembic
+alembic/
+alembic.ini
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

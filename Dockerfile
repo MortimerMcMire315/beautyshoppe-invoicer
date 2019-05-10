@@ -24,8 +24,8 @@ COPY requirements.txt /nexudus-usaepay-gateway
 RUN pip install -r requirements.txt
 
 COPY entrypoint.sh /nexudus-usaepay-gateway
-COPY alembic.ini /nexudus-usaepay-gateway
-COPY ./alembic /nexudus-usaepay-gateway/alembic
+#COPY alembic.ini /nexudus-usaepay-gateway
+#COPY ./alembic /nexudus-usaepay-gateway/alembic
 COPY main.py /nexudus-usaepay-gateway
 
 COPY ./src /nexudus-usaepay-gateway/src

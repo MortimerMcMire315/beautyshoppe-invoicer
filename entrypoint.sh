@@ -16,5 +16,5 @@ with nexudus-usaepay-gateway.  If not, see
 <https://www.gnu.org/licenses/>.
 GPL
 
-alembic upgrade head
+#alembic upgrade head
 exec $@
