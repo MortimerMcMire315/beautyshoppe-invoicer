@@ -76,7 +76,7 @@ def init():
     global global_app
 
     # Set log level
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     # Set up Flask app
     app = Flask(__name__)
