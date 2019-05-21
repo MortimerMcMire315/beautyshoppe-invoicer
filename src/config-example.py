@@ -30,5 +30,13 @@ DB_NAME = "db"
 NEXUDUS_EMAIL = "email@example.com"
 NEXUDUS_PASS = "password"
 
-#Generate using urandom
+#Don't change unless Nexudus actually changes the API URL, which they shouldn't.
+NEXUDUS_API_URL = "https://spaces.nexudus.com/api/"
+
+# List of spaces to manage. By default, when we access the Nexudus API, we get
+# data from all spaces managed by the API account. Use this list to restrict to
+# certain spaces. TODO explain how to find this ID
+NEXUDUS_SPACE_IDS = ["12345678","12345678", "12345678"]
+
+#Bytestring - Generate using urandom or similar
 FLASK_SECRET = b'\x00\x00\x00'

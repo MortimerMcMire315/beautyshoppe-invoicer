@@ -22,13 +22,14 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
-'''
-Beauty Shoppe member
-'''
 class Member(Base):
+    '''
+    Beauty Shoppe coworker
+    '''
+
     __tablename__ = 'member'
     id = Column(Integer, primary_key=True)
-    nexudus_id = Column(Integer)
+    nexudus_user_id = Column(BigInteger)
     firstname = Column(Text)
     lastname = Column(Text)
     email = Column(Text)
@@ -38,7 +39,8 @@ class Member(Base):
 class Invoice(Base):
     __tablename__ = 'invoice'
     id = Column(Integer, primary_key=True)
-    nexudus_id = Column(Integer)
+    nexudus_invoice_id = Column(BigInteger)
+    nexudus_user_id = Column(BigInteger)
     time_created = Column(DateTime)
     amount = Column(Integer)
     processed = Column(Boolean)
@@ -47,9 +49,7 @@ class Invoice(Base):
 
 class Log(Base):
     __tablename__ = 'log'
-    id = Column(Integer, primary_key=True)
+    id = Column(BigInteger, primary_key=True)
     log_level = Column(Text)
     log_message = Column(Text)
-    #invoice_id = Column(Integer, ForeignKey("invoice.id"))
-    #invoice = relationship("Invoice")
     time_created = Column(DateTime)

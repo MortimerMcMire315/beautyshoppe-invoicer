@@ -30,9 +30,6 @@ from .. import config
 import traceback
 import sys
 
-# TODO this may be unnecessary eventually
-global_app = None
-
 class Config(object):
     JOBS = [
             {
@@ -40,7 +37,9 @@ class Config(object):
                 'func': invoice_processor.run,
                 'args': (),
                 'trigger': 'interval',
-                'seconds': 10
+                'seconds': 1000,
+                'max_instances': 1,
+                'coalesce': True
             }
     ]
     SCHEDULER_API_ENABLED = True
@@ -53,7 +52,7 @@ def admin_setup(app):
     db_session = db_sessionmaker()
 
     class MemberAdminView(ModelView):
-        column_filters = ('nexudus_id', 'firstname', 'lastname', 'email')
+        column_filters = ('nexudus_user_id', 'firstname', 'lastname', 'email')
 
     admin = Admin(app, url='/', name='Beauty Shoppe ACH Administration', template_mode='bootstrap3')
     admin.add_view(MemberAdminView(models.Member, db_session))
@@ -82,6 +81,8 @@ def log_setup(app, db_session):
     return invoice_logger
 
 def init():
+    invoice_processor.run(True)
+
     # Set up Flask app
     app = Flask(__name__)
 
@@ -99,11 +100,7 @@ def init():
     # Add error page configurations
     error_page_setup(app)
 
-    # Set up APScheduler
+    # Start APScheduler jobs
     scheduler = scheduler_setup(app)
-
-    # Run initial invoice transfer
-    invoice_logger.info("Running initial invoice transfer...")
-    invoice_processor.run(True)
 
     app.run(host='0.0.0.0')
