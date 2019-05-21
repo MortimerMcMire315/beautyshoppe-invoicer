@@ -23,7 +23,8 @@ from flask_apscheduler import APScheduler
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
 
-from ..db import conn, models
+from ..app import invoice_processor
+from ..db import conn, models, loghandler
 from .. import config
 
 import traceback
@@ -32,16 +33,11 @@ import sys
 # TODO this may be unnecessary eventually
 global_app = None
 
-# TODO move elsewhere
-def invoice_transfer(initial=False):
-    global global_app
-    global_app.logger.info("yo!")
-
 class Config(object):
     JOBS = [
             {
                 'id': 'invoice_transfer',
-                'func': invoice_transfer,
+                'func': invoice_processor.run,
                 'args': (),
                 'trigger': 'interval',
                 'seconds': 10
@@ -56,12 +52,16 @@ def admin_setup(app):
     db_sessionmaker = conn.get_db_sessionmaker()
     db_session = db_sessionmaker()
 
+    class MemberAdminView(ModelView):
+        column_filters = ('nexudus_id', 'firstname', 'lastname', 'email')
+
     admin = Admin(app, url='/', name='Beauty Shoppe ACH Administration', template_mode='bootstrap3')
-    admin.add_view(ModelView(models.Member, db_session))
+    admin.add_view(MemberAdminView(models.Member, db_session))
     admin.add_view(ModelView(models.Invoice, db_session))
     admin.add_view(ModelView(models.Log, db_session))
+    return db_session
 
-def error_handler_setup(app):
+def error_page_setup(app):
     @app.errorhandler(500)
     def serverError(error):
         print("500 error:")
@@ -71,24 +71,39 @@ def scheduler_setup(app):
     scheduler = APScheduler()
     scheduler.init_app(app)
     scheduler.start()
+    return scheduler
 
-def init():
-    global global_app
-
+def log_setup(app, db_session):
     # Set log level
     logging.basicConfig(level=logging.INFO)
+    invoice_logger = logging.getLogger('invoicer')
+    # Add custom log handler to log directly to DB
+    invoice_logger.addHandler(loghandler.SQLALogHandler(db_session))
+    return invoice_logger
 
+def init():
     # Set up Flask app
     app = Flask(__name__)
-    global_app = app
+
+    # Give the app a configuration
     app.config.from_object(Config())
+
+    # FLASK_SECRET comes from config.py
     app.secret_key=config.FLASK_SECRET
 
-    admin_setup(app)
-    error_handler_setup(app)
-    scheduler_setup(app)
+    # Set up logging - get database session and pass it into the log setup so
+    # that logs can go directly to DB
+    db_session = admin_setup(app)
+    invoice_logger = log_setup(app, db_session)
 
-    app.logger.info("Running initial invoice transfer...")
-    invoice_transfer(True)
+    # Add error page configurations
+    error_page_setup(app)
+
+    # Set up APScheduler
+    scheduler = scheduler_setup(app)
+
+    # Run initial invoice transfer
+    invoice_logger.info("Running initial invoice transfer...")
+    invoice_processor.run(True)
 
     app.run(host='0.0.0.0')
