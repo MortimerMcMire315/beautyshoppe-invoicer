@@ -35,6 +35,7 @@ class Member(Base):
     email = Column(Text)
     routing_number = Column(Text)
     account_number = Column(Text)
+    process_automatically = Column(Boolean)
 
 class Invoice(Base):
     __tablename__ = 'invoice'
@@ -56,8 +57,8 @@ class Log(Base):
 
 class AuthUser():
     '''
-    Only used for flask-login authentication. This will only be created upon
-    successful authentication.
+    Dummy class only used for flask-login authentication. This will only be
+    created upon successful authentication.
     '''
     def __init__(self, nexudus_id):
         self.nexudus_id = nexudus_id

@@ -154,21 +154,10 @@ def authAPIUser(email, password):
             if u["UserId"]:
                 return models.AuthUser(u["UserId"])
             else:
-                print("yo!")
-                sys.stdout.flush()
                 return None
         except IndexError as e:
-            print("uh oh!")
-            sys.stdout.flush()
             return None
         except KeyError as e:
-            print("no!")
-            sys.stdout.flush()
             return None
     else:
-        print(email)
-        print(config.NEXUDUS_EMAIL)
-        print(password)
-        print(config.NEXUDUS_PASS)
-        sys.stdout.flush()
         return None
