@@ -22,8 +22,10 @@ import pprint
 
 import requests
 import json
+from wtforms.validators import ValidationError
 
 from .. import config
+from ..db import models
 
 def run(initial=False, callback=None):
     '''
@@ -69,7 +71,7 @@ def nexudus_get(url_part, payload):
 
         yield res["Records"]
 
-def nexudus_process_single(url_part, callback, payload={}):
+def nexudus_process_onebyone(url_part, callback, payload={}):
     '''
     Make a Nexudus GET request and process each single returned record with the
     given callback function.
@@ -99,6 +101,10 @@ def nexudus_process_batch(url_part, callback, payload={}):
     for record_list in nexudus_get(url_part, payload):
         callback(record_list)
 
+def nexudus_get_first(url_part, payload={}):
+    g = nexudus_get(url_part, payload)
+    return next(g)[0]
+
 def nexudus_get_invoice_list():
     '''
 
@@ -108,7 +114,7 @@ def nexudus_get_invoice_list():
         'CoworkerInvoice_Paid' : 'false',
     }
 
-    nexudus_process_single('billing/coworkerinvoices', lambda r: print(r["Coworker"]), payload)
+    nexudus_process_onebyone('billing/coworkerinvoices', lambda r: print(r["Coworker"]), payload)
 
 def populate_member_table():
     '''
@@ -132,3 +138,37 @@ def populate_member_table():
             nexudus_process_batch('spaces/coworkers', callback, payload)
     else:
         nexudus_process_batch('spaces/coworkers', callback, payload)
+
+def authAPIUser(email, password):
+    '''
+    Simple authentication - just ensure that the login user has API access.
+    '''
+
+    if email == config.NEXUDUS_EMAIL and password == config.NEXUDUS_PASS:
+        payload = {
+            'Coworker_Email' : email
+        }
+
+        try:
+            u = nexudus_get_first('spaces/coworkers', payload)
+            if u["UserId"]:
+                return models.AuthUser(u["UserId"])
+            else:
+                print("yo!")
+                sys.stdout.flush()
+                return None
+        except IndexError as e:
+            print("uh oh!")
+            sys.stdout.flush()
+            return None
+        except KeyError as e:
+            print("no!")
+            sys.stdout.flush()
+            return None
+    else:
+        print(email)
+        print(config.NEXUDUS_EMAIL)
+        print(password)
+        print(config.NEXUDUS_PASS)
+        sys.stdout.flush()
+        return None

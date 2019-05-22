@@ -53,3 +53,33 @@ class Log(Base):
     log_level = Column(Text)
     log_message = Column(Text)
     time_created = Column(DateTime)
+
+class AuthUser():
+    '''
+    Only used for flask-login authentication. This will only be created upon
+    successful authentication.
+    '''
+    def __init__(self, nexudus_id):
+        self.nexudus_id = nexudus_id
+
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_active(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        if self.authenticated:
+            return False
+        else:
+            return True
+
+    def get_id(self):
+        return self.nexudus_id
+
+    def __unicode__(self):
+        return self.email
+

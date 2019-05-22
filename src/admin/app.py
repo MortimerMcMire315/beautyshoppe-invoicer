@@ -16,25 +16,27 @@ with nexudus-usaepay-gateway.  If not, see
 <https://www.gnu.org/licenses/>.
 '''
 
-from flask import Flask
-import logging
+from flask import Flask, render_template
 
 from flask_apscheduler import APScheduler
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
+import flask_login as login
 
-from ..app import invoice_processor
+from ..nexudus import nexudus
 from ..db import conn, models, loghandler
 from .. import config
+from . import auth
 
 import traceback
 import sys
+import logging
 
 class Config(object):
     JOBS = [
             {
                 'id': 'invoice_transfer',
-                'func': invoice_processor.run,
+                'func': nexudus.run,
                 'args': (),
                 'trigger': 'interval',
                 'seconds': 1000,
@@ -51,13 +53,26 @@ def admin_setup(app):
     db_sessionmaker = conn.get_db_sessionmaker()
     db_session = db_sessionmaker()
 
-    class MemberAdminView(ModelView):
+    class AuthModelView(ModelView):
+        def is_accessible(self):
+            return login.current_user.is_authenticated
+
+    class MemberAdminView(AuthModelView):
         column_filters = ('nexudus_user_id', 'firstname', 'lastname', 'email')
 
-    admin = Admin(app, url='/', name='Beauty Shoppe ACH Administration', template_mode='bootstrap3')
+    auth.init_login(db_session, app)
+
+    @app.route('/')
+    def index():
+        return render_template('index.html')
+
+    admin = Admin(app, name='Beauty Shoppe ACH Administration',
+                  base_template='my_master.html',
+                  index_view=auth.MyAdminIndexView(),
+                  template_mode='bootstrap3' )
     admin.add_view(MemberAdminView(models.Member, db_session))
-    admin.add_view(ModelView(models.Invoice, db_session))
-    admin.add_view(ModelView(models.Log, db_session))
+    admin.add_view(AuthModelView(models.Invoice, db_session))
+    admin.add_view(AuthModelView(models.Log, db_session))
     return db_session
 
 def error_page_setup(app):
@@ -81,7 +96,7 @@ def log_setup(app, db_session):
     return invoice_logger
 
 def init():
-    invoice_processor.run(True)
+    # TODO nexudus.run(True)
 
     # Set up Flask app
     app = Flask(__name__)
