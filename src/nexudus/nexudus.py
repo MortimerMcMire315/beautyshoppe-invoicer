@@ -1,18 +1,18 @@
 '''
-This file is part of PROJECTNAME.
+This file is part of nexudus-usaepay-gateway.
 
-PROJECTNAME is free software: you can redistribute it and/or
+nexudus-usaepay-gateway is free software: you can redistribute it and/or
 modify it under the terms of the GNU General Public License as published
 by the Free Software Foundation, either version 3 of the License, or (at
 your option) any later version.
 
-PROJECTNAME is distributed in the hope that it will be
+nexudus-usaepay-gateway is distributed in the hope that it will be
 useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 General Public License for more details.
 
 You should have received a copy of the GNU General Public License along
-with PROJECTNAME.  If not, see
+with nexudus-usaepay-gateway.  If not, see
 <https://www.gnu.org/licenses/>.
 '''
 
@@ -23,18 +23,19 @@ import pprint
 import requests
 import json
 from wtforms.validators import ValidationError
+from sqlalchemy.orm.exc import MultipleResultsFound
 
 from .. import config
-from ..db import models
+from ..db import models, conn
 
-def run(initial=False, callback=None):
+def run(initial=False):
     '''
     Entry point for invoice processing.
     Establishes a connection to Nexudus and processes any new invoices.
 
+    :param sm: Database sessionmaker
     :param initial: True if this is the first run of the job upon
                     starting up the app.
-    :param callback: Callback function TODO
     '''
 
     # Get logger and tell it we're doing something
@@ -42,7 +43,8 @@ def run(initial=False, callback=None):
     logger.debug("Running...")
 
     # Connect to Nexudus
-    populate_member_table()
+    sm = conn.get_db_sessionmaker()
+    populate_member_table(sm)
 
 def nexudus_get(url_part, payload):
     '''
@@ -116,16 +118,58 @@ def nexudus_get_invoice_list():
 
     nexudus_process_onebyone('billing/coworkerinvoices', lambda r: print(r["Coworker"]), payload)
 
-def populate_member_table():
+def nexudus_to_sqla_member(record, db_sess):
+    '''
+    :param record: Member dict from Nexudus API call
+    :param db_sess: DB Session
+    :return: A merged Member to store in our database.
+
+    Compare a Member record from the Nexudus database with any record we have
+    for the same user. If a non-null field from the Nexudus database
+    contradicts a field in our database, overwrite our field (favoring Nexudus
+    as the primary source of user data).
     '''
 
+    try:
+        local_user = db_sess.query(models.Member).filter_by(nexudus_user_id = record["Id"]).one_or_none()
+    except MultipleResultsFound as e:
+        local_users = db_sess.query(models.Member).filter_by(nexudus_user_id = record["Id"]).all()
+        print(record)
+        for u in local_users:
+            print(u.fullname)
+            print(u.nexudus_user_id)
+            sys.stdout.flush()
+            print()
+        exit(1)
+
+    user_to_save = models.Member(
+        nexudus_user_id = record["Id"],
+        fullname = record["FullName"],
+        email = record["Email"],
+        routing_number = record["BankBranch"],
+        account_number = record["BankAccount"],
+        process_automatically = True # TODO work this out
+    )
+
+    if local_user:
+        if local_user.routing_number and not user_to_save.routing_number:
+            user_to_save.routing_number = local_user.routing_number
+        if local_user.account_number and not user_to_save.account_number:
+            user_to_save.account_number = local_user.account_number
+
+    return user_to_save
+
+def populate_member_table(sm):
     '''
 
-    def callback(rs):
-        for r in rs:
-            # pp = pprint.PrettyPrinter(indent=4)
-            # pp.pprint(r)
-            print(r["FullName"])
+    :param sm: Database sessionmaker
+    '''
+
+    db_sess = sm()
+    def callback(records):
+        for record in records:
+            member = nexudus_to_sqla_member(record, db_sess)
+            db_sess.merge(member)
 
     payload = {
 
@@ -138,6 +182,8 @@ def populate_member_table():
             nexudus_process_batch('spaces/coworkers', callback, payload)
     else:
         nexudus_process_batch('spaces/coworkers', callback, payload)
+    print("Committing...")
+    db_sess.commit()
 
 def authAPIUser(email, password):
     '''
@@ -151,8 +197,8 @@ def authAPIUser(email, password):
 
         try:
             u = nexudus_get_first('spaces/coworkers', payload)
-            if u["UserId"]:
-                return models.AuthUser(u["UserId"])
+            if u["Id"]:
+                return models.AuthUser(u["Id"])
             else:
                 return None
         except IndexError as e:

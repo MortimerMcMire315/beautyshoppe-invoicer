@@ -30,8 +30,7 @@ class Member(Base):
     __tablename__ = 'member'
     id = Column(Integer, primary_key=True)
     nexudus_user_id = Column(BigInteger)
-    firstname = Column(Text)
-    lastname = Column(Text)
+    fullname = Column(Text)
     email = Column(Text)
     routing_number = Column(Text)
     account_number = Column(Text)

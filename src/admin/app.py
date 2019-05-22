@@ -37,9 +37,8 @@ class Config(object):
             {
                 'id': 'invoice_transfer',
                 'func': nexudus.run,
-                'args': (),
                 'trigger': 'interval',
-                'seconds': 1000,
+                'seconds': 10,
                 'max_instances': 1,
                 'coalesce': True
             }
@@ -50,18 +49,26 @@ class Config(object):
     PROPAGATE_EXCEPTIONS = True
 
 def admin_setup(app):
-    db_sessionmaker = conn.get_db_sessionmaker()
-    db_session = db_sessionmaker()
+    '''
 
+    '''
+
+    # Get database sessionmaker and get a session.
+    sm = conn.get_db_sessionmaker()
+    db_session = sm()
+
+    # We use this class for model views to ensure that a user must be
+    # authenticated to view them.
     class AuthModelView(ModelView):
         def is_accessible(self):
             return login.current_user.is_authenticated
 
     class MemberAdminView(AuthModelView):
-        column_filters = ('nexudus_user_id', 'firstname', 'lastname', 'email')
+        column_filters = ('nexudus_user_id', 'fullname', 'email')
 
     auth.init_login(db_session, app)
 
+    # Set up admin front page
     @app.route('/')
     def index():
         return render_template('index.html')
@@ -96,10 +103,9 @@ def log_setup(app, db_session):
     return invoice_logger
 
 def init():
-    # TODO nexudus.run(True)
-
     # Set up Flask app
     app = Flask(__name__)
+    db_session = admin_setup(app)
 
     # Give the app a configuration
     app.config.from_object(Config())
@@ -109,7 +115,6 @@ def init():
 
     # Set up logging - get database session and pass it into the log setup so
     # that logs can go directly to DB
-    db_session = admin_setup(app)
     invoice_logger = log_setup(app, db_session)
 
     # Add error page configurations
