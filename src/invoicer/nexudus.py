@@ -28,24 +28,6 @@ from sqlalchemy.orm.exc import MultipleResultsFound
 from .. import config
 from ..db import models, conn
 
-def run(initial=False):
-    '''
-    Entry point for invoice processing.
-    Establishes a connection to Nexudus and processes any new invoices.
-
-    :param sm: Database sessionmaker
-    :param initial: True if this is the first run of the job upon
-                    starting up the app.
-    '''
-
-    # Get logger and tell it we're doing something
-    logger = logging.getLogger('invoicer')
-    logger.debug("Running...")
-
-    # Connect to Nexudus
-    sm = conn.get_db_sessionmaker()
-    populate_member_table(sm)
-
 def nexudus_get(url_part, payload):
     '''
     Generator which GETs Nexudus records and yields batches of records.
@@ -107,18 +89,20 @@ def nexudus_get_first(url_part, payload={}):
     g = nexudus_get(url_part, payload)
     return next(g)[0]
 
-def nexudus_get_invoice_list():
+def get_invoice_list():
     '''
 
     '''
 
     payload = {
         'CoworkerInvoice_Paid' : 'false',
+        'CoworkerInvoice_Coworker' : 721134193,
+        'CoworkerInvoice_Coworker' : 253585422
     }
 
-    nexudus_process_onebyone('billing/coworkerinvoices', lambda r: print(r["Coworker"]), payload)
+    nexudus_process_onebyone('billing/coworkerinvoices', lambda r: (print(r["CoworkerId"]), print(r["BusinessId"])), payload)
 
-def nexudus_to_sqla_member(record, db_sess):
+def add_or_overwrite_member(record, db_sess):
     '''
     :param record: Member dict from Nexudus API call
     :param db_sess: DB Session
@@ -142,25 +126,42 @@ def nexudus_to_sqla_member(record, db_sess):
             print()
         exit(1)
 
-    user_to_save = models.Member(
-        nexudus_user_id = record["Id"],
-        fullname = record["FullName"],
-        email = record["Email"],
-        routing_number = record["BankBranch"],
-        account_number = record["BankAccount"],
-        process_automatically = True # TODO work this out
-    )
+    if not local_user:
+        local_user = models.Member()
+        db_sess.add(local_user)
 
-    if local_user:
-        if local_user.routing_number and not user_to_save.routing_number:
-            user_to_save.routing_number = local_user.routing_number
-        if local_user.account_number and not user_to_save.account_number:
-            user_to_save.account_number = local_user.account_number
+    local_user.nexudus_user_id = record["Id"]
+    local_user.fullname = record["FullName"]
+    local_user.email = record["Email"]
+    local_user.routing_number = record["BankBranch"]
+    local_user.account_number = record["BankAccount"]
 
-    return user_to_save
+    nstrip = lambda s: s.strip() if s else None
+
+    if nstrip(local_user.routing_number) and nstrip(local_user.account_number):
+        local_user.process_automatically = True # TODO work this out
+    else:
+        local_user.process_automatically = False
+
+    # TODO is it okay to commit every single one separately?
+    # pp = pprint.PrettyPrinter(indent=4)
+    # pp.pprint(record)
+    print("Committing " + local_user.email + " ...")
+    db_sess.commit()
+
+def process_invoices(callback, sm):
+
+    spaces = config.NEXUDUS_SPACE_IDS
+    if spaces:
+        for space in spaces:
+            payload['CoworkerInvoice_Business'] = space
+            nexudus_process_onebyone('spaces/coworkers', callback, payload)
+    else:
+        nexudus_process_onebyone('spaces/coworkers', callback, payload)
 
 def populate_member_table(sm):
     '''
+    Fills local Member table with records from the Nexudus database.
 
     :param sm: Database sessionmaker
     '''
@@ -168,13 +169,15 @@ def populate_member_table(sm):
     db_sess = sm()
     def callback(records):
         for record in records:
-            member = nexudus_to_sqla_member(record, db_sess)
-            db_sess.merge(member)
+            member = add_or_overwrite_member(record, db_sess)
 
     payload = {
-
+        'Coworker_Active' : 'true'
     }
 
+    # It is important that we only grab coworkers from the spaces we actually
+    # want to manage. If we don't do this, coworkers will be pulled from all
+    # spaces that this account has access to.
     spaces = config.NEXUDUS_SPACE_IDS
     if spaces:
         for space in spaces:
@@ -182,8 +185,6 @@ def populate_member_table(sm):
             nexudus_process_batch('spaces/coworkers', callback, payload)
     else:
         nexudus_process_batch('spaces/coworkers', callback, payload)
-    print("Committing...")
-    db_sess.commit()
 
 def authAPIUser(email, password):
     '''

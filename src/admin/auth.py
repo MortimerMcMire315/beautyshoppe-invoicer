@@ -20,7 +20,7 @@ from wtforms import form, fields, validators
 from flask import url_for, redirect, render_template, request
 from flask_admin import AdminIndexView, expose, helpers
 
-from ..nexudus import nexudus
+from ..invoicer import nexudus
 from ..db import models
 
 import flask_login as login

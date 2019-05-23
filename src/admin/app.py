@@ -23,7 +23,7 @@ from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
 import flask_login as login
 
-from ..nexudus import nexudus
+from ..invoicer import invoicer
 from ..db import conn, models, loghandler
 from .. import config
 from . import auth
@@ -36,9 +36,9 @@ class Config(object):
     JOBS = [
             {
                 'id': 'invoice_transfer',
-                'func': nexudus.run,
+                'func': invoicer.run,
                 'trigger': 'interval',
-                'seconds': 10,
+                'seconds': 1000,
                 'max_instances': 1,
                 'coalesce': True
             }
@@ -120,6 +120,7 @@ def init():
     # Add error page configurations
     error_page_setup(app)
 
+    invoicer.run(True)
     # Start APScheduler jobs
     scheduler = scheduler_setup(app)
 
