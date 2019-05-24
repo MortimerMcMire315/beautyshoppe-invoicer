@@ -30,4 +30,4 @@ COPY main.py /nexudus-usaepay-gateway
 
 COPY ./src /nexudus-usaepay-gateway/src
 
-ENTRYPOINT sh ./entrypoint.sh python main.py
+RUN python main.py
