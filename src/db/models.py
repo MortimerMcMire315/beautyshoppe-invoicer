@@ -16,11 +16,14 @@ with nexudus-usaepay-gateway.  If not, see
 <https://www.gnu.org/licenses/>.
 '''
 
-from sqlalchemy import Column, DateTime, Text, Integer, ForeignKey, Boolean, BigInteger, DECIMAL
+from sqlalchemy import (
+        Column, DateTime, Text, Integer, ForeignKey, Boolean, BigInteger,
+        DECIMAL)
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
+
 
 class Member(Base):
     '''
@@ -36,16 +39,18 @@ class Member(Base):
     account_number = Column(Text)
     process_automatically = Column(Boolean)
 
+
 class Invoice(Base):
     __tablename__ = 'invoice'
     id = Column(Integer, primary_key=True)
     nexudus_invoice_id = Column(BigInteger)
     nexudus_user_id = Column(BigInteger)
     time_created = Column(DateTime)
-    amount = Column(DECIMAL(precision=10,scale=2))
+    amount = Column(DECIMAL(precision=10, scale=2))
     processed = Column(Boolean)
     txn_id = Column(BigInteger)
     txn_status = Column(Text)
+
 
 class Log(Base):
     __tablename__ = 'log'
@@ -53,6 +58,7 @@ class Log(Base):
     log_level = Column(Text)
     log_message = Column(Text)
     time_created = Column(DateTime)
+
 
 class AuthUser():
     '''
@@ -82,4 +88,3 @@ class AuthUser():
 
     def __unicode__(self):
         return self.email
-

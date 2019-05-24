@@ -32,7 +32,9 @@ import traceback
 import sys
 import logging
 
+
 class Config(object):
+    # These jobs get run by flask-apscheduler.
     JOBS = [
             {
                 'id': 'invoice_transfer',
@@ -48,9 +50,10 @@ class Config(object):
     ENV = 'development'
     PROPAGATE_EXCEPTIONS = True
 
+
 def admin_setup(app):
     '''
-
+    Initialize admin interface.
     '''
 
     # Get database sessionmaker and get a session.
@@ -73,34 +76,51 @@ def admin_setup(app):
     def index():
         return render_template('index.html')
 
-    admin = Admin(app, name='Beauty Shoppe ACH Administration',
+    admin = Admin(app,
+                  name='Beauty Shoppe ACH Administration',
                   base_template='my_master.html',
                   index_view=auth.MyAdminIndexView(),
-                  template_mode='bootstrap3' )
+                  template_mode='bootstrap3')
     admin.add_view(MemberAdminView(models.Member, db_session))
     admin.add_view(AuthModelView(models.Invoice, db_session))
     admin.add_view(AuthModelView(models.Log, db_session))
     return db_session
 
+
 def error_page_setup(app):
+    '''
+    Add error pages for the Flask app.
+    '''
+
     @app.errorhandler(500)
     def serverError(error):
         print("500 error:")
         print(traceback.format_exc())
 
+
 def scheduler_setup(app):
+    '''
+    Initialize APScheduler and start running jobs.
+    '''
+
     scheduler = APScheduler()
     scheduler.init_app(app)
     scheduler.start()
     return scheduler
 
+
 def log_setup(app, db_session):
+    '''
+    Set up a database logger for our invoicer system.
+    '''
+
     # Set log level
     logging.basicConfig(level=logging.DEBUG)
     invoice_logger = logging.getLogger('invoicer')
     # Add custom log handler to log directly to DB
     invoice_logger.addHandler(loghandler.SQLALogHandler(db_session))
     return invoice_logger
+
 
 def init():
     # Set up Flask app
@@ -111,7 +131,7 @@ def init():
     app.config.from_object(Config())
 
     # FLASK_SECRET comes from config.py
-    app.secret_key=config.FLASK_SECRET
+    app.secret_key = config.FLASK_SECRET
 
     # Set up logging - get database session and pass it into the log setup so
     # that logs can go directly to DB

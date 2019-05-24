@@ -23,8 +23,18 @@ from sqlalchemy.ext.declarative import declarative_base
 from .. import config
 from .models import Base
 
+
 def get_db_sessionmaker():
-    connection_string = '{DB_TYPE}://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}'.format(
+    conn_string_template = (
+        '{DB_TYPE}'
+        '://{DB_USER}'
+        ':{DB_PASS}'
+        '@{DB_HOST}'
+        ':{DB_PORT}'
+        '/{DB_NAME}'
+    )
+
+    connection_string = conn_string_template.format(
         DB_TYPE=config.DB_TYPE,
         DB_USER=config.DB_USER,
         DB_PASS=config.DB_PASS,

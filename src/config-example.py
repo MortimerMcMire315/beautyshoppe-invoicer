@@ -30,7 +30,8 @@ DB_NAME = "db"
 NEXUDUS_EMAIL = "email@example.com"
 NEXUDUS_PASS = "password"
 
-#Don't change unless Nexudus actually changes the API URL, which they shouldn't.
+# Don't change unless Nexudus actually changes the API URL, which they
+# shouldn't.
 NEXUDUS_API_URL = "https://spaces.nexudus.com/api/"
 
 # List of spaces to manage. By default, when we access the Nexudus API, we get
@@ -43,7 +44,7 @@ NEXUDUS_API_URL = "https://spaces.nexudus.com/api/"
 #
 # To restrict to a single space, just use a single string in a list, like
 # ["12345678"]
-NEXUDUS_SPACE_IDS = ["12345678","12345678", "12345678"]
+NEXUDUS_SPACE_IDS = ["12345678", "12345678", "12345678"]
 
-#Bytestring - Generate using urandom or similar
+# Bytestring - Generate using urandom or similar
 FLASK_SECRET = b'\x00\x00\x00'

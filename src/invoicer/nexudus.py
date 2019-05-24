@@ -160,7 +160,7 @@ def add_or_overwrite_invoice(record, db_sess):
     # issue updates than the alternatives. Since we're not working with
     # hundreds of thousands of rows at a time, I think this is fine.
     flask_logger = logging.getLogger('flask.app')
-    flask_logger.debug("Syncing " + str(invoice_to_add.nexudus_invoice_id) + " ...")
+    flask_logger.debug("Syncing " + str(invoice_to_add.nexudus_invoice_id))
     db_sess.commit()
 
 

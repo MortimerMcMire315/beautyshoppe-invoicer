@@ -24,17 +24,18 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from . import models
 
+
 class SQLALogHandler(logging.Handler):
     def __init__(self, db_session):
         logging.Handler.__init__(self)
         self.db_session = db_session
 
     def emit(self, record):
-        #Set current time
+        # Set current time
         t = int(time.time())
-        logrow = models.Log(log_level    = record.levelname,
-                            log_message  = record.msg,
-                            time_created = datetime.datetime.now())
+        logrow = models.Log(log_level=record.levelname,
+                            log_message=record.msg,
+                            time_created=datetime.datetime.now())
 
         try:
             self.db_session.add(logrow)

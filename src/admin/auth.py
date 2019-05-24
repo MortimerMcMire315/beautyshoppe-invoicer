@@ -26,9 +26,10 @@ from ..db import models
 import flask_login as login
 
 '''
-This file is plagiarized mostly from
+This file is largely plagiarized from
 https://github.com/flask-admin/flask-admin/blob/master/examples/auth-flask-login/app.py
 '''
+
 
 def init_login(db_session, app):
     login_manager = login.LoginManager()
@@ -38,6 +39,7 @@ def init_login(db_session, app):
     @login_manager.user_loader
     def load_user(user_id):
         return models.AuthUser(user_id)
+
 
 class MyAdminIndexView(AdminIndexView):
     @expose('/')
@@ -64,6 +66,7 @@ class MyAdminIndexView(AdminIndexView):
     def logout_view(self):
         login.logout_user()
         return redirect(url_for('.index'))
+
 
 class LoginForm(form.Form):
     login = fields.StringField(validators=[validators.required()])
