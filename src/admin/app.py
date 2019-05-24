@@ -38,7 +38,7 @@ class Config(object):
                 'id': 'invoice_transfer',
                 'func': invoicer.run,
                 'trigger': 'interval',
-                'seconds': 1000,
+                'seconds': 10,
                 'max_instances': 1,
                 'coalesce': True
             }
@@ -96,7 +96,7 @@ def scheduler_setup(app):
 
 def log_setup(app, db_session):
     # Set log level
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     invoice_logger = logging.getLogger('invoicer')
     # Add custom log handler to log directly to DB
     invoice_logger.addHandler(loghandler.SQLALogHandler(db_session))

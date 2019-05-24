@@ -106,47 +106,53 @@ def add_or_overwrite_member(record, db_sess):
     '''
     :param record: Member dict from Nexudus API call
     :param db_sess: DB Session
-    :return: A merged Member to store in our database.
 
     Compare a Member record from the Nexudus database with any record we have
-    for the same user. If a non-null field from the Nexudus database
-    contradicts a field in our database, overwrite our field (favoring Nexudus
-    as the primary source of user data).
+    for the same user. If a field from the Nexudus database contradicts a field
+    in our database, overwrite our field (favoring Nexudus as the primary
+    source of user data).
     '''
 
     try:
-        local_user = db_sess.query(models.Member).filter_by(nexudus_user_id = record["Id"]).one_or_none()
+        member_to_add = db_sess.query(models.Member).filter_by(nexudus_user_id = record["Id"]).one_or_none()
     except MultipleResultsFound as e:
-        local_users = db_sess.query(models.Member).filter_by(nexudus_user_id = record["Id"]).all()
-        print(record)
-        for u in local_users:
-            print(u.fullname)
-            print(u.nexudus_user_id)
-            sys.stdout.flush()
-            print()
-        exit(1)
+        logger = logging.getLogger('invoicer')
+        logger.warn("Consistency warning: Multiple users in database session with Nexudus ID " +
+                    record["Id"] + ". Removing all copies of this user and re-syncing.")
+        db_sess.query(models.Member).filter_by(nexudus_user_id = record["Id"]).delete()
+        member_to_add = None
 
-    if not local_user:
-        local_user = models.Member()
-        db_sess.add(local_user)
+    # Flag for later use
+    already_stored = True
 
-    local_user.nexudus_user_id = record["Id"]
-    local_user.fullname = record["FullName"]
-    local_user.email = record["Email"]
-    local_user.routing_number = record["BankBranch"]
-    local_user.account_number = record["BankAccount"]
+    if not member_to_add:
+        member_to_add = models.Member()
+        db_sess.add(member_to_add)
+        already_stored = False
+
+    member_to_add.nexudus_user_id = record["Id"]
+    member_to_add.fullname = record["FullName"]
+    member_to_add.email = record["Email"]
+    member_to_add.routing_number = record["BankBranch"]
+    member_to_add.account_number = record["BankAccount"]
 
     nstrip = lambda s: s.strip() if s else None
 
-    if nstrip(local_user.routing_number) and nstrip(local_user.account_number):
-        local_user.process_automatically = True # TODO work this out
+    # If the ACH info looks populated in Nexudus, we'll consider setting this
+    # user's invoices to be processed automatically.
+    if nstrip(member_to_add.routing_number) and nstrip(member_to_add.account_number):
+        # If we've already stored the user, we want to save our earlier
+        # preference for automatic processing.
+        if not already_stored:
+            member_to_add.process_automatically = config.PROCESS_AUTOMATICALLY
     else:
-        local_user.process_automatically = False
+        member_to_add.process_automatically = False
 
-    # TODO is it okay to commit every single one separately?
-    # pp = pprint.PrettyPrinter(indent=4)
-    # pp.pprint(record)
-    print("Committing " + local_user.email + " ...")
+    # Committing each user separately is slower, but a much clearer way to
+    # issue updates than the alternatives. Since we're not working with
+    # hundreds of thousands of rows at a time, I think this is fine.
+    flask_logger = logging.getLogger('flask.app')
+    flask_logger.debug("Syncing " + member_to_add.email + " ...")
     db_sess.commit()
 
 def process_invoices(callback, sm):
@@ -172,7 +178,8 @@ def populate_member_table(sm):
             member = add_or_overwrite_member(record, db_sess)
 
     payload = {
-        'Coworker_Active' : 'true'
+        'Coworker_Active' : 'true',
+        'size' : 100
     }
 
     # It is important that we only grab coworkers from the spaces we actually
