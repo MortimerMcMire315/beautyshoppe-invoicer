@@ -1,4 +1,4 @@
-'''
+"""
 This file is part of nexudus-usaepay-gateway.
 
 nexudus-usaepay-gateway is free software: you can redistribute it and/or
@@ -14,7 +14,7 @@ General Public License for more details.
 You should have received a copy of the GNU General Public License along
 with nexudus-usaepay-gateway.  If not, see
 <https://www.gnu.org/licenses/>.
-'''
+"""
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -25,6 +25,11 @@ from .models import Base
 
 
 def get_db_sessionmaker():
+    """
+    Return a SQLAlchemy sessionmaker for our database.
+
+    :returns: sqlalchemy sessionmaker object
+    """
     conn_string_template = (
         '{DB_TYPE}'
         '://{DB_USER}'

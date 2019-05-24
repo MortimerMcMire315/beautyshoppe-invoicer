@@ -1,4 +1,4 @@
-'''
+"""
 This file is part of nexudus-usaepay-gateway.
 
 nexudus-usaepay-gateway is free software: you can redistribute it and/or
@@ -14,7 +14,7 @@ General Public License for more details.
 You should have received a copy of the GNU General Public License along
 with nexudus-usaepay-gateway.  If not, see
 <https://www.gnu.org/licenses/>.
-'''
+"""
 
 from flask import Flask, render_template
 
@@ -34,6 +34,8 @@ import logging
 
 
 class Config(object):
+    """Flask config object."""
+
     # These jobs get run by flask-apscheduler.
     JOBS = [
             {
@@ -52,10 +54,7 @@ class Config(object):
 
 
 def admin_setup(app):
-    '''
-    Initialize admin interface.
-    '''
-
+    """Initialize admin interface."""
     # Get database sessionmaker and get a session.
     sm = conn.get_db_sessionmaker()
     db_session = sm()
@@ -88,10 +87,7 @@ def admin_setup(app):
 
 
 def error_page_setup(app):
-    '''
-    Add error pages for the Flask app.
-    '''
-
+    """Define error pages for the Flask app."""
     @app.errorhandler(500)
     def serverError(error):
         print("500 error:")
@@ -99,10 +95,7 @@ def error_page_setup(app):
 
 
 def scheduler_setup(app):
-    '''
-    Initialize APScheduler and start running jobs.
-    '''
-
+    """Initialize APScheduler and start running jobs."""
     scheduler = APScheduler()
     scheduler.init_app(app)
     scheduler.start()
@@ -110,10 +103,7 @@ def scheduler_setup(app):
 
 
 def log_setup(app, db_session):
-    '''
-    Set up a database logger for our invoicer system.
-    '''
-
+    """Set up a database logger for our invoicer system."""
     # Set log level
     logging.basicConfig(level=logging.DEBUG)
     invoice_logger = logging.getLogger('invoicer')
@@ -123,6 +113,7 @@ def log_setup(app, db_session):
 
 
 def init():
+    """Initialize application."""
     # Set up Flask app
     app = Flask(__name__)
     db_session = admin_setup(app)

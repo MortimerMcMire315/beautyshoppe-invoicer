@@ -1,4 +1,4 @@
-'''
+"""
 This file is part of nexudus-usaepay-gateway.
 
 nexudus-usaepay-gateway is free software: you can redistribute it and/or
@@ -14,7 +14,7 @@ General Public License for more details.
 You should have received a copy of the GNU General Public License along
 with nexudus-usaepay-gateway.  If not, see
 <https://www.gnu.org/licenses/>.
-'''
+"""
 
 from wtforms import form, fields, validators
 from flask import url_for, redirect, render_template, request
@@ -32,6 +32,7 @@ https://github.com/flask-admin/flask-admin/blob/master/examples/auth-flask-login
 
 
 def init_login(db_session, app):
+    """Create login manager and add user loader function."""
     login_manager = login.LoginManager()
     login_manager.init_app(app)
 
@@ -42,14 +43,18 @@ def init_login(db_session, app):
 
 
 class MyAdminIndexView(AdminIndexView):
+    """Override default admin view to redirect to login page if not authenticated."""
+
     @expose('/')
     def index(self):
+        """Define site index page (simple redirect)."""
         if not login.current_user.is_authenticated:
             return redirect(url_for('.login_view'))
         return super(MyAdminIndexView, self).index()
 
     @expose('/login/', methods=('GET', 'POST'))
     def login_view(self):
+        """Site login view."""
         # handle user login
         form = LoginForm(request.form)
         if helpers.validate_form_on_submit(form):
@@ -64,19 +69,24 @@ class MyAdminIndexView(AdminIndexView):
 
     @expose('/logout')
     def logout_view(self):
+        """Site logout."""
         login.logout_user()
         return redirect(url_for('.index'))
 
 
 class LoginForm(form.Form):
+    """Simple login form calling nexudus.authAPIUser."""
+
     login = fields.StringField(validators=[validators.required()])
     password = fields.PasswordField(validators=[validators.required()])
 
     def validate_login(self, field):
+        """Check the user's credentials."""
         user = self.get_user()
 
         if user is None:
             raise validators.ValidationError('Invalid user')
 
     def get_user(self):
+        """Try authenticating the user."""
         return nexudus.authAPIUser(self.login.data, self.password.data)

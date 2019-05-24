@@ -1,4 +1,4 @@
-'''
+"""
 This file is part of nexudus-usaepay-gateway.
 
 nexudus-usaepay-gateway is free software: you can redistribute it and/or
@@ -14,7 +14,7 @@ General Public License for more details.
 You should have received a copy of the GNU General Public License along
 with nexudus-usaepay-gateway.  If not, see
 <https://www.gnu.org/licenses/>.
-'''
+"""
 
 from sqlalchemy import (
         Column, DateTime, Text, Integer, ForeignKey, Boolean, BigInteger,
@@ -26,9 +26,7 @@ Base = declarative_base()
 
 
 class Member(Base):
-    '''
-    Beauty Shoppe coworker
-    '''
+    """Beauty Shoppe coworker."""
 
     __tablename__ = 'member'
     id = Column(Integer, primary_key=True)
@@ -41,6 +39,8 @@ class Member(Base):
 
 
 class Invoice(Base):
+    """Invoice emitted from Nexudus supplemented with our own status info."""
+
     __tablename__ = 'invoice'
     id = Column(Integer, primary_key=True)
     nexudus_invoice_id = Column(BigInteger)
@@ -53,6 +53,8 @@ class Invoice(Base):
 
 
 class Log(Base):
+    """Basic log table."""
+
     __tablename__ = 'log'
     id = Column(BigInteger, primary_key=True)
     log_level = Column(Text)
@@ -61,30 +63,38 @@ class Log(Base):
 
 
 class AuthUser():
-    '''
-    Dummy class only used for flask-login authentication. This will only be
-    created upon successful authentication.
-    '''
+    """
+    Dummy class only used for flask-login authentication.
+
+    Will only be created upon successful authentication.
+    """
+
     def __init__(self, nexudus_id):
+        """Set the user's nexudus ID."""
         self.nexudus_id = nexudus_id
 
     @property
     def is_authenticated(self):
+        """Required for Flask-Login. Always true."""
         return True
 
     @property
     def is_active(self):
+        """Required for Flask-Login. Always true."""
         return True
 
     @property
     def is_anonymous(self):
+        """Required for Flask-Login. True if authenticated."""
         if self.authenticated:
             return False
         else:
             return True
 
     def get_id(self):
+        """Return Nexudus ID."""
         return self.nexudus_id
 
     def __unicode__(self):
+        """Return user's email address."""
         return self.email

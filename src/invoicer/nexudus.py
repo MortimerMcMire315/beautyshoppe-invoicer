@@ -1,4 +1,4 @@
-'''
+"""
 This file is part of nexudus-usaepay-gateway.
 
 nexudus-usaepay-gateway is free software: you can redistribute it and/or
@@ -14,7 +14,7 @@ General Public License for more details.
 You should have received a copy of the GNU General Public License along
 with nexudus-usaepay-gateway.  If not, see
 <https://www.gnu.org/licenses/>.
-'''
+"""
 
 import logging
 import sys
@@ -31,15 +31,14 @@ from ..db import models, conn
 
 
 def nexudus_get(url_part, payload):
-    '''
+    """
     Generator which GETs Nexudus records and yields batches of records.
 
     :param url_part: Nexudus API URL - everything after "/api/".
     :param payload: GET variables to send along with API request
     :returns: Yields a batch of records (list of dicts).
     :raises: TODO
-    '''
-
+    """
     url = config.NEXUDUS_API_URL + url_part
     creds = (config.NEXUDUS_EMAIL, config.NEXUDUS_PASS)
     params = payload
@@ -59,24 +58,24 @@ def nexudus_get(url_part, payload):
 
 
 def nexudus_process_onebyone(url_part, callback, payload={}):
-    '''
-    Make a Nexudus GET request and process each single returned record with the
-    given callback function.
+    """
+    Make a Nexudus GET request and process each single returned record.
 
     :param url_part: Nexudus API URL - everything after "/api/".
     :param callback: Callback function to process each return record. Takes a
                      single argument (dict)
     :param payload: GET variables to send along with API request. Default
                     empty.
-    '''
+    """
     for record_list in nexudus_get(url_part, payload):
         for record in record_list:
             callback(record)
 
 
 def nexudus_process_batch(url_part, callback, payload={}):
-    '''
+    """
     Make a Nexudus GET request and process the returned records in batches.
+
     Default batch size is 25, but can be changed with a payload variable, e.g.
     { "size" : 1000 }
 
@@ -85,25 +84,27 @@ def nexudus_process_batch(url_part, callback, payload={}):
                      single argument (dict)
     :param payload: GET variables to send along with API request. Default
                     empty.
-    '''
+    """
     for record_list in nexudus_get(url_part, payload):
         callback(record_list)
 
 
 def nexudus_get_first(url_part, payload={}):
+    """
+    Make a Nexudus GET request and return only the first result.
+
+    :param url_part: Nexudus API URL - everything after "/api".
+    :param payload: GET variables to send along with API request. Default
+                    empty.
+    """
     g = nexudus_get(url_part, payload)
     return next(g)[0]
 
 
 def get_invoice_list():
-    '''
-
-    '''
-
+    """Print a list of unpaid invoices."""
     payload = {
         'CoworkerInvoice_Paid': 'false',
-        'CoworkerInvoice_Coworker': 721134193,
-        'CoworkerInvoice_Coworker': 253585422
     }
 
     def callback(r):
@@ -115,19 +116,20 @@ def get_invoice_list():
 
 
 def add_or_overwrite_invoice(record, db_sess):
-    '''
-    :param record: Invoice dict from Nexudus API call
-    :param db_sess: DB Session
+    """
+    Add a new Invoice record from Nexudus into our database.
 
-    Compare an Invoice record from the Nexudus database with any record we have
-    for the same user. If a field from the Nexudus database contradicts a field
-    in our database, overwrite our field (favoring Nexudus as the primary
-    source of user data).
+    This compares an Invoice record from the Nexudus database with any record
+    we have for the same user. If a field from the Nexudus database contradicts
+    a field in our database, overwrite our field (favoring Nexudus as the
+    primary source of user data).
 
     These two nearly-identical callback functions are not very DRY. Consider
     finding a way to generalize them later.
-    '''
 
+    :param record: Invoice dict from Nexudus API call
+    :param db_sess: DB Session
+    """
     try:
         invoice_to_add = db_sess.query(models.Invoice).\
             filter_by(nexudus_invoice_id=record["Id"]).one_or_none()
@@ -165,16 +167,17 @@ def add_or_overwrite_invoice(record, db_sess):
 
 
 def add_or_overwrite_member(record, db_sess):
-    '''
+    """
+    Add a new Member record from Nexudus to our database.
+
+    This Compares a Member record from the Nexudus database with any record we
+    have for the same user. If a field from the Nexudus database contradicts a
+    field in our database, overwrite our field (favoring Nexudus as the primary
+    source of user data).
+
     :param record: Member dict from Nexudus API call
     :param db_sess: DB Session
-
-    Compare a Member record from the Nexudus database with any record we have
-    for the same user. If a field from the Nexudus database contradicts a field
-    in our database, overwrite our field (favoring Nexudus as the primary
-    source of user data).
-    '''
-
+    """
     try:
         member_to_add = db_sess.query(models.Member).\
             filter_by(nexudus_user_id=record["Id"]).one_or_none()
@@ -227,8 +230,8 @@ def add_or_overwrite_member(record, db_sess):
 
 
 def sync_table(sm, sync_callback, payload, business_var, url_part):
-    '''
-    Updates a local table using records from the Nexudus database.
+    """
+    Update a local table using records from the Nexudus database.
 
     :param sm: SQLAlchemy SessionMaker
     :param sync_callback: The "add_or_overwrite" callback that is used to
@@ -237,9 +240,7 @@ def sync_table(sm, sync_callback, payload, business_var, url_part):
     :param business_var: Nexudus API variable to cross-reference with the
         Space, e.g. CoworkerInvoice_Business or Coworker_InvoicingBusiness
     :param url_part: Nexudus API URL, e.g. 'spaces/coworkers'
-
-    '''
-
+    """
     db_sess = sm()
 
     def callback(records):
@@ -260,12 +261,11 @@ def sync_table(sm, sync_callback, payload, business_var, url_part):
 
 
 def sync_member_table(sm):
-    '''
-    Fills local Member table with records from the Nexudus database.
+    """
+    Fill local Member table with records from the Nexudus database.
 
     :param sm: Database sessionmaker
-    '''
-
+    """
     payload = {
         'Coworker_Active': 'true',
         'size': 100
@@ -281,12 +281,11 @@ def sync_member_table(sm):
 
 
 def sync_invoice_table(sm):
-    '''
-    Fills local Invoice table with records from the Nexudus database.
+    """
+    Fill local Invoice table with records from the Nexudus database.
 
     :param sm: Database sessionmaker
-    '''
-
+    """
     # Only pull unpaid invoices.
     payload = {
         'CoworkerInvoice_Paid': 'false',
@@ -303,13 +302,12 @@ def sync_invoice_table(sm):
 
 
 def authAPIUser(email, password):
-    '''
+    """
     Simple authentication - just ensure that the login user is the API user.
 
     :param email: API user email address
     :param password: API user password
-    '''
-
+    """
     if email == config.NEXUDUS_EMAIL and password == config.NEXUDUS_PASS:
         payload = {
             'Coworker_Email': email
