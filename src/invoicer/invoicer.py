@@ -19,9 +19,8 @@ def run(initial=False):
 
     # Connect to Nexudus
     sm = conn.get_db_sessionmaker()
-    nexudus.populate_member_table(sm)
-
-    # nexudus.process_invoices(charge_payment, sm)
+    nexudus.sync_member_table(sm)
+    nexudus.sync_invoice_table(sm)
 
 def charge_payment(Invoice):
     pass

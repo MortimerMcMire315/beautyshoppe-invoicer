@@ -16,7 +16,7 @@ with nexudus-usaepay-gateway.  If not, see
 <https://www.gnu.org/licenses/>.
 '''
 
-from sqlalchemy import Column, DateTime, Text, Integer, ForeignKey, Boolean, BigInteger
+from sqlalchemy import Column, DateTime, Text, Integer, ForeignKey, Boolean, BigInteger, DECIMAL
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -42,7 +42,7 @@ class Invoice(Base):
     nexudus_invoice_id = Column(BigInteger)
     nexudus_user_id = Column(BigInteger)
     time_created = Column(DateTime)
-    amount = Column(Integer)
+    amount = Column(DECIMAL(precision=10,scale=2))
     processed = Column(Boolean)
     txn_id = Column(BigInteger)
     txn_status = Column(Text)

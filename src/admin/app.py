@@ -38,7 +38,7 @@ class Config(object):
                 'id': 'invoice_transfer',
                 'func': invoicer.run,
                 'trigger': 'interval',
-                'seconds': 10,
+                'seconds': 1000,
                 'max_instances': 1,
                 'coalesce': True
             }

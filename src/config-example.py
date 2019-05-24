@@ -35,7 +35,14 @@ NEXUDUS_API_URL = "https://spaces.nexudus.com/api/"
 
 # List of spaces to manage. By default, when we access the Nexudus API, we get
 # data from all spaces managed by the API account. Use this list to restrict to
-# certain spaces. TODO explain how to find this ID
+# certain spaces.
+#
+# To find your space ID, log into spaces.nexudus.com, select a space, and check
+# the page source. then CTRL-F for the string "businessId". The ID listed in
+# the javascript is the ID for the space that you're currently managing.
+#
+# To restrict to a single space, just use a single string in a list, like
+# ["12345678"]
 NEXUDUS_SPACE_IDS = ["12345678","12345678", "12345678"]
 
 #Bytestring - Generate using urandom or similar
