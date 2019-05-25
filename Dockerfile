@@ -24,7 +24,14 @@ COPY requirements.txt /nexudus-usaepay-gateway
 RUN pip install -r requirements.txt
 
 COPY main.py /nexudus-usaepay-gateway
+COPY entrypoint.sh /nexudus-usaepay-gateway
 
 COPY ./src /nexudus-usaepay-gateway/src
 
-RUN python main.py
+# For some reason ENTRYPOINT ignores errors during 'docker-compose build' and
+# preserves them during 'docker-compose up', where RUN freaks out if we get
+# errors during build. We have to expect errors during build, because the
+# Python app can't connect to the DB until after the build, so it tries to run
+# and freaks out. I've RTFM but I can't figure out why this is the behavior.
+# -SAY
+ENTRYPOINT bash ./entrypoint.sh python main.py
