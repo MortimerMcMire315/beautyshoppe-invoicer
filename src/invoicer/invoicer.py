@@ -17,9 +17,12 @@ with nexudus-usaepay-gateway.  If not, see
 """
 
 import logging
+import sys
 
 from . import nexudus
+from . import usaepay
 from ..db import conn, models
+from ..db.models import Invoice, Member
 
 
 def run(initial=False):
@@ -35,9 +38,26 @@ def run(initial=False):
 
     # Connect to Nexudus
     sm = conn.get_db_sessionmaker()
-    nexudus.sync_member_table(sm)
-    nexudus.sync_invoice_table(sm)
+    # nexudus.sync_member_table(sm)
+    # nexudus.sync_invoice_table(sm)
+    charge_unpaid_invoices(sm)
 
 
-# def charge_payment(Invoice):
-#     pass
+def charge_unpaid_invoices(sm):
+    """
+    Runs the invoices in our database through USAePay.
+
+    :param sm: SQLAlchemy sessionmaker obj
+    """
+
+    db_sess = sm()
+
+    # unpaid_invoices = db_sess.query(Invoice).\
+    #     join(Member, Invoice.nexudus_user_id == Member.nexudus_user_id).\
+    #     filter(Member.process_automatically == False).all()
+
+    unpaid_invoices = db_sess.query(Invoice).\
+        filter(Invoice.member.has(process_automatically=False)).all()
+
+    print(unpaid_invoices)
+    sys.stdout.flush()

@@ -6,6 +6,11 @@ src/config.py
 alembic/
 alembic.ini
 
+# Vim crap
+.swp
+.swo
+.swn
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

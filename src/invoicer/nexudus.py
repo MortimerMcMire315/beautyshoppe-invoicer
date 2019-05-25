@@ -30,7 +30,7 @@ from .. import config
 from ..db import models, conn
 
 
-def nexudus_get(url_part, payload):
+def get_records(url_part, payload):
     """
     Generator which GETs Nexudus records and yields batches of records.
 
@@ -57,22 +57,22 @@ def nexudus_get(url_part, payload):
         yield res["Records"]
 
 
-def nexudus_process_onebyone(url_part, callback, payload={}):
+def process_onebyone(url_part, callback, payload={}):
     """
     Make a Nexudus GET request and process each single returned record.
 
     :param url_part: Nexudus API URL - everything after "/api/".
-    :param callback: Callback function to process each return record. Takes a
-                     single argument (dict)
+    :param callback: Callback function to process each return record. Callback
+                     should take a single argument (dict)
     :param payload: GET variables to send along with API request. Default
                     empty.
     """
-    for record_list in nexudus_get(url_part, payload):
+    for record_list in get_records(url_part, payload):
         for record in record_list:
             callback(record)
 
 
-def nexudus_process_batch(url_part, callback, payload={}):
+def process_batch(url_part, callback, payload={}):
     """
     Make a Nexudus GET request and process the returned records in batches.
 
@@ -85,11 +85,11 @@ def nexudus_process_batch(url_part, callback, payload={}):
     :param payload: GET variables to send along with API request. Default
                     empty.
     """
-    for record_list in nexudus_get(url_part, payload):
+    for record_list in get_records(url_part, payload):
         callback(record_list)
 
 
-def nexudus_get_first(url_part, payload={}):
+def get_first(url_part, payload={}):
     """
     Make a Nexudus GET request and return only the first result.
 
@@ -97,7 +97,7 @@ def nexudus_get_first(url_part, payload={}):
     :param payload: GET variables to send along with API request. Default
                     empty.
     """
-    g = nexudus_get(url_part, payload)
+    g = get_records(url_part, payload)
     return next(g)[0]
 
 
@@ -111,7 +111,7 @@ def get_invoice_list():
         print(r["CoworkerId"])
         print(r["BusinessId"])
 
-    nexudus_process_onebyone('billing/coworkerinvoices',
+    process_onebyone('billing/coworkerinvoices',
                              callback, payload)
 
 
@@ -164,7 +164,6 @@ def add_or_overwrite_invoice(record, db_sess):
     flask_logger = logging.getLogger('flask.app')
     flask_logger.debug("Syncing " + str(invoice_to_add.nexudus_invoice_id))
     db_sess.commit()
-
 
 def add_or_overwrite_member(record, db_sess):
     """
@@ -255,9 +254,9 @@ def sync_table(sm, sync_callback, payload, business_var, url_part):
     if spaces:
         for space in spaces:
             payload[business_var] = space
-            nexudus_process_batch(url_part, callback, payload)
+            process_batch(url_part, callback, payload)
     else:
-        nexudus_process_batch(url_part, callback, payload)
+        process_batch(url_part, callback, payload)
 
 
 def sync_member_table(sm):
@@ -299,29 +298,3 @@ def sync_invoice_table(sm):
         'CoworkerInvoice_Business',
         'billing/coworkerinvoices'
     )
-
-
-def authAPIUser(email, password):
-    """
-    Simple authentication - just ensure that the login user is the API user.
-
-    :param email: API user email address
-    :param password: API user password
-    """
-    if email == config.NEXUDUS_EMAIL and password == config.NEXUDUS_PASS:
-        payload = {
-            'Coworker_Email': email
-        }
-
-        try:
-            u = nexudus_get_first('spaces/coworkers', payload)
-            if u["Id"]:
-                return models.AuthUser(u["Id"])
-            else:
-                return None
-        except IndexError as e:
-            return None
-        except KeyError as e:
-            return None
-    else:
-        return None

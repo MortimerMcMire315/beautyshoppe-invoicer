@@ -44,12 +44,14 @@ class Invoice(Base):
     __tablename__ = 'invoice'
     id = Column(Integer, primary_key=True)
     nexudus_invoice_id = Column(BigInteger)
-    nexudus_user_id = Column(BigInteger)
+    nexudus_user_id = Column(BigInteger, ForeignKey('member.nexudus_user_id'))
     time_created = Column(DateTime)
     amount = Column(DECIMAL(precision=10, scale=2))
     processed = Column(Boolean)
     txn_id = Column(BigInteger)
     txn_status = Column(Text)
+
+    member = relationship("Member")
 
 
 class Log(Base):

@@ -43,7 +43,11 @@ def init_login(db_session, app):
 
 
 class MyAdminIndexView(AdminIndexView):
-    """Override default admin view to redirect to login page if not authenticated."""
+    """
+    Overrides default admin view to enforce login.
+
+    The index view will redirec to /login if the user is not authenticated.
+    """
 
     @expose('/')
     def index(self):
@@ -89,4 +93,30 @@ class LoginForm(form.Form):
 
     def get_user(self):
         """Try authenticating the user."""
-        return nexudus.authAPIUser(self.login.data, self.password.data)
+        return authAPIUser(self.login.data, self.password.data)
+
+
+def authAPIUser(email, password):
+    """
+    Simple authentication - just ensure that the login user is the API user.
+
+    :param email: API user email address
+    :param password: API user password
+    """
+    if email == config.NEXUDUS_EMAIL and password == config.NEXUDUS_PASS:
+        payload = {
+            'Coworker_Email': email
+        }
+
+        try:
+            u = nexudus.get_first('spaces/coworkers', payload)
+            if u["Id"]:
+                return models.AuthUser(u["Id"])
+            else:
+                return None
+        except IndexError as e:
+            return None
+        except KeyError as e:
+            return None
+    else:
+        return None
