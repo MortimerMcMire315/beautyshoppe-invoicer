@@ -38,26 +38,27 @@ def run(initial=False):
 
     # Connect to Nexudus
     sm = conn.get_db_sessionmaker()
+
+    # TODO clean up members that are no longer active first
     # nexudus.sync_member_table(sm)
+
+    # # TODO clean up invoices that have been paid first
     # nexudus.sync_invoice_table(sm)
     charge_unpaid_invoices(sm)
 
 
 def charge_unpaid_invoices(sm):
     """
-    Runs the invoices in our database through USAePay.
+    Run the invoices in our database through USAePay.
 
     :param sm: SQLAlchemy sessionmaker obj
     """
-
     db_sess = sm()
 
-    # unpaid_invoices = db_sess.query(Invoice).\
-    #     join(Member, Invoice.nexudus_user_id == Member.nexudus_user_id).\
-    #     filter(Member.process_automatically == False).all()
-
     unpaid_invoices = db_sess.query(Invoice).\
-        filter(Invoice.member.has(process_automatically=False)).all()
+        filter(Invoice.member.has(process_automatically=True)).all()
 
-    print(unpaid_invoices)
-    sys.stdout.flush()
+    for invoice in unpaid_invoices:
+        print(invoice.member.fullname)
+        sys.stdout.flush()
+        usaepay.create_charge(invoice)

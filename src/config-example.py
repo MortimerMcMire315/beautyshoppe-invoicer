@@ -46,5 +46,12 @@ NEXUDUS_API_URL = "https://spaces.nexudus.com/api/"
 # ["12345678"]
 NEXUDUS_SPACE_IDS = ["12345678", "12345678", "12345678"]
 
-# Bytestring - Generate using urandom or similar
+USAEPAY_API_URL = "https://sandbox.usaepay.com/secure/gate.php"
+USAEPAY_API_KEY = "_thequickbrownfoxjumpsoverthelazydog"
+USAEPAY_API_PIN = "123456"
+
+# TODO explain this
+PROCESS_AUTOMATICALLY = True
+
+# Bytestring - Generate using urandom or similar. Should be 10-20 characters
 FLASK_SECRET = b'\x00\x00\x00'

@@ -22,6 +22,7 @@ from flask_admin import AdminIndexView, expose, helpers
 
 from ..invoicer import nexudus
 from ..db import models
+from .. import config
 
 import flask_login as login
 

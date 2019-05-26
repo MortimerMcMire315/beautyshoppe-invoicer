@@ -37,6 +37,9 @@ class Member(Base):
     account_number = Column(Text)
     process_automatically = Column(Boolean)
 
+    def __str__(self):
+        return self.email
+
 
 class Invoice(Base):
     """Invoice emitted from Nexudus supplemented with our own status info."""

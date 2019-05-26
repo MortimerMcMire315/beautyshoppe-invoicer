@@ -152,6 +152,7 @@ def add_or_overwrite_invoice(record, db_sess):
 
     invoice_to_add.nexudus_invoice_id = record["Id"]
     invoice_to_add.nexudus_user_id = record["CoworkerId"]
+    # TODO do this for real
     invoice_to_add.time_created = datetime.datetime.now()
     invoice_to_add.amount = float(record["TotalAmount"])
     invoice_to_add.processed = False
