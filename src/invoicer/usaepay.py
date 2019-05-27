@@ -20,6 +20,8 @@ import os
 import sys
 import hashlib
 import base64
+import random
+import string
 
 import requests
 
@@ -32,12 +34,24 @@ def create_charge(invoice):
     :param invoice: models.Invoice object
     """
     # Documentation: https://help.usaepay.info/developer/rest-api/
-    seed = base64.b64encode(os.urandom(15)).decode('utf-8')
+    seed = ''.join(random.choices(string.ascii_letters, k=10))
+
     prehash = config.USAEPAY_API_KEY + seed + config.USAEPAY_API_PIN
+    print("Prehash: " + prehash)
+    print("Seed: " + seed)
+    print("Hashed prehash: " + hashlib.sha256(prehash.encode('utf-8')).hexdigest())
     apihash = 's2/' + seed + '/' + hashlib.sha256(prehash.encode('utf-8')).hexdigest()
+    print("API hash: " + apihash)
     creds = (config.USAEPAY_API_KEY, apihash)
 
-    r = requests.get(config.USAEPAY_API_URL, auth=creds)
+    payload = {
+        'command': 'check:sale',
+        'routing': '123456789',
+        'account': '129837102971203987',
+        'amount': '1.00',
+    }
+
+    r = requests.get(config.USAEPAY_API_URL, auth=creds, params=payload)
 
     print(r.status_code)
     print(r.text)
