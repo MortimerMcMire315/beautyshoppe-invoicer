@@ -16,43 +16,111 @@ with nexudus-usaepay-gateway.  If not, see
 <https://www.gnu.org/licenses/>.
 """
 
-import os
 import sys
 import hashlib
-import base64
 import random
 import string
+import logging
 
 import requests
 
 from .. import config
 
-def create_charge(invoice):
-    """
-    Create a USAePay charge based on the given invoice
+APPROVED = "A"
 
-    :param invoice: models.Invoice object
+def debug_api_request(seed, prehash, apihash):
     """
-    # Documentation: https://help.usaepay.info/developer/rest-api/
+    Print info about a USAePay API request.
+
+    :param seed: Random seed
+    :param prehash: USAePay prehash value
+    :param apihash: USAePay hash value
+    """
+    print("Prehash: " + prehash)
+    print("Seed: " + seed)
+    print(
+        "Hashed prehash: " +
+        hashlib.sha256(prehash.encode('utf-8')).hexdigest()
+    )
+    print("API hash: " + apihash)
+
+    import http.client as http_client
+    http_client.HTTPConnection.debuglevel = 1
+
+    logging.basicConfig()
+    logging.getLogger().setLevel(logging.DEBUG)
+    requests_log = logging.getLogger("requests.packages.urllib3")
+    requests_log.setLevel(logging.DEBUG)
+    requests_log.propagate = True
+    sys.stdout.flush()
+
+
+def api_request(api_url, payload=None, reqtype='POST'):
+    """
+    Send a request to USAePay's REST API.
+
+    Sparse documentation for the API can be found here:
+        https://help.usaepay.info/developer/rest-api/
+        https://help.usaepay.info/developer/rest-api/changelog/
+
+    :param api_url: URL fragment (e.g. '/transactions')
+    :param payload: Data to send in JSON format
+    :return: TODO
+    """
     seed = ''.join(random.choices(string.ascii_letters, k=10))
 
     prehash = config.USAEPAY_API_KEY + seed + config.USAEPAY_API_PIN
-    print("Prehash: " + prehash)
-    print("Seed: " + seed)
-    print("Hashed prehash: " + hashlib.sha256(prehash.encode('utf-8')).hexdigest())
-    apihash = 's2/' + seed + '/' + hashlib.sha256(prehash.encode('utf-8')).hexdigest()
-    print("API hash: " + apihash)
+    apihash = 's2/' + seed + '/' +\
+        hashlib.sha256(prehash.encode('utf-8')).hexdigest()
     creds = (config.USAEPAY_API_KEY, apihash)
 
+    # debug_api_request(seed, prehash, apihash)
+
+    if reqtype == 'GET':
+        reqfunc = requests.get
+    elif reqtype == 'POST':
+        reqfunc = requests.post
+    else:
+        raise Exception("Unsupported request type " + reqtype)
+
+    if payload is None:
+        r = reqfunc(config.USAEPAY_API_URL + api_url,
+                          auth=creds)
+    else:
+        r = reqfunc(config.USAEPAY_API_URL + api_url,
+                       auth=creds,
+                       json=payload)
+    return r
+
+
+def create_transaction(invoice):
+    """
+    Create a USAePay charge based on the given invoice.
+
+    :param invoice: models.Invoice object
+    :return: TODO
+    """
     payload = {
         'command': 'check:sale',
-        'routing': '123456789',
-        'account': '129837102971203987',
-        'amount': '1.00',
+        'amount': str(invoice.amount),
+        'check': {
+            'accountholder': invoice.member.billing_name,
+            'account': invoice.member.account_number,
+            'routing': invoice.member.routing_number,
+        },
     }
 
-    r = requests.get(config.USAEPAY_API_URL, auth=creds, params=payload)
+    r = api_request('/transactions', payload=payload)
+    r.raise_for_status()
+    return r.json()
 
-    print(r.status_code)
-    print(r.text)
-    sys.stdout.flush()
+
+def get_transaction_status(txn_key):
+    """
+
+    """
+
+    r = api_request('/transactions/' + txn_key, reqtype='GET')
+    r.raise_for_status()
+
+    return r.json()

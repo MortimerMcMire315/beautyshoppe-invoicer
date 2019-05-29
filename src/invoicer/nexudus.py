@@ -111,8 +111,11 @@ def get_invoice_list():
         print(r["CoworkerId"])
         print(r["BusinessId"])
 
-    process_onebyone('billing/coworkerinvoices',
-                             callback, payload)
+    process_onebyone(
+        'billing/coworkerinvoices',
+        callback,
+        payload
+    )
 
 
 def add_or_overwrite_invoice(record, db_sess):
@@ -130,6 +133,20 @@ def add_or_overwrite_invoice(record, db_sess):
     :param record: Invoice dict from Nexudus API call
     :param db_sess: DB Session
     """
+    # First, determine if the corresponding member is set to process
+    # automatically. If not, we have nothing to do here; just short-circuit.
+    try:
+        corresponding_member = db_sess.query(models.Member).\
+            filter_by(nexudus_user_id=record["CoworkerId"]).one_or_none()
+
+        if corresponding_member and not corresponding_member.process_automatically:
+            return
+
+    except MultipleResultsFound as e:
+        logger = logging.getLogger('invoicere')
+        logger.warn('Consistency warning: Multiple users in database ' +
+                    'with Nexudus ID ' + str(record["CoworkerId"]) + ".")
+
     try:
         invoice_to_add = db_sess.query(models.Invoice).\
             filter_by(nexudus_invoice_id=record["Id"]).one_or_none()
@@ -142,29 +159,25 @@ def add_or_overwrite_invoice(record, db_sess):
             filter_by(nexudus_invoice_id=record["Id"]).delete()
         invoice_to_add = None
 
-    # Flag for later use.
-    already_stored = True
-
+    # Add the invoice if it's not already in the DB. If it's already in, we
+    # have nothing to do here.
     if not invoice_to_add:
         invoice_to_add = models.Invoice()
+        invoice_to_add.nexudus_invoice_id = record["Id"]
+        invoice_to_add.nexudus_user_id = record["CoworkerId"]
+        # TODO do this for real
+        invoice_to_add.time_created = datetime.datetime.now()
+        invoice_to_add.amount = float(record["TotalAmount"])
+        invoice_to_add.finalized = False
+        invoice_to_add.txn_id = None
+        invoice_to_add.txn_status = "Not processed"
+
         db_sess.add(invoice_to_add)
-        already_stored = False
+        flask_logger = logging.getLogger('flask.app')
+        flask_logger.debug("Syncing " + str(invoice_to_add.nexudus_invoice_id))
 
-    invoice_to_add.nexudus_invoice_id = record["Id"]
-    invoice_to_add.nexudus_user_id = record["CoworkerId"]
-    # TODO do this for real
-    invoice_to_add.time_created = datetime.datetime.now()
-    invoice_to_add.amount = float(record["TotalAmount"])
-    invoice_to_add.processed = False
-    invoice_to_add.txn_id = None
-    invoice_to_add.status = "Not processed"
+        db_sess.commit()
 
-    # Committing each user separately is slower, but a much clearer way to
-    # issue updates than the alternatives. Since we're not working with
-    # hundreds of thousands of rows at a time, I think this is fine.
-    flask_logger = logging.getLogger('flask.app')
-    flask_logger.debug("Syncing " + str(invoice_to_add.nexudus_invoice_id))
-    db_sess.commit()
 
 def add_or_overwrite_member(record, db_sess):
     """
@@ -200,11 +213,13 @@ def add_or_overwrite_member(record, db_sess):
 
     member_to_add.nexudus_user_id = record["Id"]
     member_to_add.fullname = record["FullName"]
+    member_to_add.billing_name = record["BillingName"] or record["FullName"]
     member_to_add.email = record["Email"]
     member_to_add.routing_number = record["BankBranch"]
     member_to_add.account_number = record["BankAccount"]
 
     def nstrip(s):
+        """Return stripped string or None"""
         if s:
             return s.strip()
         else:

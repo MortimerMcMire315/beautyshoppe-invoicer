@@ -40,12 +40,11 @@ def run(initial=False):
     sm = conn.get_db_sessionmaker()
 
     # TODO clean up members that are no longer active first
-    # nexudus.sync_member_table(sm)
+    nexudus.sync_member_table(sm)
 
-    # # TODO clean up invoices that have been paid first
-    # nexudus.sync_invoice_table(sm)
+    # TODO clean up invoices that have been paid first
+    nexudus.sync_invoice_table(sm)
     charge_unpaid_invoices(sm)
-
 
 def charge_unpaid_invoices(sm):
     """
@@ -55,10 +54,43 @@ def charge_unpaid_invoices(sm):
     """
     db_sess = sm()
 
+    # Only try to pay invoices if the corresponding Member is set to be
+    # processed automatically.
     unpaid_invoices = db_sess.query(Invoice).\
-        filter(Invoice.member.has(process_automatically=True)).all()
+        filter(Invoice.member.has(process_automatically=True)).\
+        filter_by(finalized=False).all()
 
     for invoice in unpaid_invoices:
-        print(invoice.member.fullname)
-        sys.stdout.flush()
-        usaepay.create_charge(invoice)
+        logger = logging.getLogger('invoicer')
+        logger.debug("Processing invoice for " + invoice.member.fullname)
+        res = usaepay.create_transaction(invoice)
+
+        if res["result_code"] != usaepay.APPROVED:
+            log_transaction_exception(res["result_code"], res["error"])
+        else:
+            print(res)
+            mark_transaction_status(invoice, res, db_sess)
+
+def log_transaction_exception(result_code, result):
+    """
+
+    """
+    print(result)
+
+
+def mark_transaction_status(invoice, res, db_sess):
+    """
+
+    :param invoice: models.Invoice object
+    :param res: JSON response from usaepay.create_transaction call
+    :param sm: SQLAlchemy sessionmaker object
+    """
+    print("committing invoice...")
+
+    invoice.txn_key = res["key"]
+    invoice.txn_resultcode = usaepay.APPROVED
+    status_dict = usaepay.get_transaction_status(invoice.txn_key)
+    invoice.txn_statuscode = status_dict["status_code"]
+    invoice.txn_status = status_dict["status"]
+
+    db_sess.commit()
