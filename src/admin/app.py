@@ -101,6 +101,7 @@ def app_setup(app, db_session):
 
     @app.teardown_request
     def teardown_request(*args, **kwargs):
+        # If we don't do this, the flask-admin view doesn't update sometimes.
         db_session.expire_all()
         db_session.close()
 

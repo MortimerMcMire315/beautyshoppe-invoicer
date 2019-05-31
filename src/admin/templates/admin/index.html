@@ -10,7 +10,6 @@
 
     <div>
         {% if current_user.is_authenticated %}
-            <h1>Automatic ACH payment processing</h1>
             <a id="process-invoices" class="btn btn-default" href="/process-invoices/">Process Invoices</a>
             <div id="processing-log"></div>
         {% else %}

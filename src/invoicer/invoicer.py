@@ -20,7 +20,7 @@ import logging
 import sys
 
 import flask
-from sqlalchemy import or_
+from sqlalchemy import or_, and_
 
 from . import nexudus
 from . import usaepay
@@ -70,10 +70,18 @@ def charge_unpaid_invoices(sm):
 
     # Only try to pay invoices if the corresponding Member is set to be
     # processed automatically AND the invoice does not yet have a transaction
-    # status.
+    # status AND the member has account/routing information.
     unsent_invoices = db_sess.query(Invoice).\
         filter(
             Invoice.member.has(process_automatically=True)
+        ).\
+        filter(
+            and_(
+                Invoice.member.has(Member.account_number != None),
+                Invoice.member.has(Member.account_number != ''),
+                Invoice.member.has(Member.routing_number != None),
+                Invoice.member.has(Member.routing_number != '')
+            )
         ).\
         filter(
             or_(
@@ -121,6 +129,7 @@ def check_invoice_approvals(sm):
         logger.info(">>> Checking for settled transactions...")
 
     for invoice in approved_invoices:
+        # TODO run USAePay check
         logger.info(
             "    Checking transaction status for " +
             str(invoice.member) +
@@ -150,6 +159,7 @@ def mark_transaction_status(invoice, res, db_sess):
 
     invoice.txn_key = res["key"]
     invoice.txn_resultcode = usaepay.APPROVED
+    invoice.txn_result = "Approved"
     status_dict = usaepay.get_transaction_status(invoice.txn_key)
     invoice.txn_statuscode = status_dict["status_code"]
     invoice.txn_status = status_dict["status"]

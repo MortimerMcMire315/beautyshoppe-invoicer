@@ -235,6 +235,7 @@ def add_or_overwrite_member(record, db_sess):
     # user's invoices to be processed automatically.
     if nstrip(member_to_add.routing_number)\
             and nstrip(member_to_add.account_number):
+
         # If we've already stored the user, we want to save our earlier
         # preference for automatic processing.
         if not already_stored:

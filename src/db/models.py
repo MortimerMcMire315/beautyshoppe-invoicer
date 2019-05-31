@@ -54,6 +54,7 @@ class Invoice(Base):
     finalized = Column(Boolean)
     txn_key = Column(Text)
     txn_resultcode = Column(Text)
+    txn_result = Column(Text)
     txn_statuscode = Column(Text)
     txn_status = Column(Text)
 
