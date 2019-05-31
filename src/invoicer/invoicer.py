@@ -19,50 +19,80 @@ with nexudus-usaepay-gateway.  If not, see
 import logging
 import sys
 
+import flask
+from sqlalchemy import or_
+
 from . import nexudus
 from . import usaepay
 from ..db import conn, models
 from ..db.models import Invoice, Member
 
 
-def run(initial=False):
+def run():
     """
     Establish a connection to Nexudus and processes any new invoices.
-
-    :param initial: True if this is the first run of the job upon
-                    starting up the app.
     """
     # Get logger and tell it we're doing something
-    logger = logging.getLogger('invoicer')
-    logger.debug("Running...")
+    ajax_logger = logging.getLogger('invoicer_ajax')
+    ajax_logger.info("Running...")
+
+    # db_logger = logging.getLogger('invoicer_db')
+    # db_logger.info("Running...")
 
     # Connect to Nexudus
     sm = conn.get_db_sessionmaker()
 
     # TODO clean up members that are no longer active first
-    nexudus.sync_member_table(sm)
+    # ajax_logger.info(">>> Syncing member table...")
+    # nexudus.sync_member_table(sm)
 
     # TODO clean up invoices that have been paid first
+    ajax_logger.info(">>> Getting unpaid invoices from Nexudus...")
     nexudus.sync_invoice_table(sm)
     charge_unpaid_invoices(sm)
 
+    # TODO check approved, pending invoices for acceptance
+    check_invoice_approvals(sm)
+
+
 def charge_unpaid_invoices(sm):
     """
-    Run the invoices in our database through USAePay.
+    Run unpaid invoices in our database through USAePay.
 
-    :param sm: SQLAlchemy sessionmaker obj
+    An invoice is considered "unpaid" (aka due) if it is in our database, but
+    has no txn_status. Any invoice that we've attempted to send to SQLAlchemy
+    will have some txn_status.
+
+    :param sm: SQLAlchemy sessionmaker object
     """
     db_sess = sm()
+    logger = logging.getLogger('invoicer_ajax')
 
     # Only try to pay invoices if the corresponding Member is set to be
-    # processed automatically.
-    unpaid_invoices = db_sess.query(Invoice).\
-        filter(Invoice.member.has(process_automatically=True)).\
-        filter_by(finalized=False).all()
+    # processed automatically AND the invoice does not yet have a transaction
+    # status.
+    unsent_invoices = db_sess.query(Invoice).\
+        filter(
+            Invoice.member.has(process_automatically=True)
+        ).\
+        filter(
+            or_(
+                Invoice.txn_resultcode == None,
+                Invoice.txn_resultcode == ''
+            )
+        ).all()
 
-    for invoice in unpaid_invoices:
-        logger = logging.getLogger('invoicer')
-        logger.debug("Processing invoice for " + invoice.member.fullname)
+    logger.info(">>> Checking for new transactions to send to USAePay...")
+
+    if len(unsent_invoices) == 0:
+        logger.info("    No new transactions sent.")
+
+    for invoice in unsent_invoices:
+        logger.info(
+            "    Processing invoice for " + str(invoice.member) +
+            "... Sending new transaction to USAePay"
+        )
+
         res = usaepay.create_transaction(invoice)
 
         if res["result_code"] != usaepay.APPROVED:
@@ -71,9 +101,41 @@ def charge_unpaid_invoices(sm):
             print(res)
             mark_transaction_status(invoice, res, db_sess)
 
-def log_transaction_exception(result_code, result):
+
+def check_invoice_approvals(sm):
+    """
+    Check if any "Approved" invoices have been submitted to the bank.
+
+    :param sm: SQLAlchemy sessionmaker object
     """
 
+    db_sess = sm()
+    logger = logging.getLogger('invoicer_ajax')
+
+
+    approved_invoices = db_sess.query(Invoice).\
+        filter(Invoice.member.has(process_automatically=True)).\
+        filter_by(txn_resultcode='A').all()
+
+    if len(approved_invoices) != 0:
+        logger.info(">>> Checking for settled transactions...")
+
+    for invoice in approved_invoices:
+        logger.info(
+            "    Checking transaction status for " +
+            str(invoice.member) +
+            " (Invoice ID " + str(invoice.nexudus_invoice_id) + ")"
+            "..."
+        )
+        logger.info(
+            "    USAePay Transaction "
+            + str(invoice.txn_key)
+            + " pending."
+        )
+
+def log_transaction_exception(result_code, result):
+    """
+    Mark transaction status and log the error.
     """
     print(result)
 
@@ -85,7 +147,6 @@ def mark_transaction_status(invoice, res, db_sess):
     :param res: JSON response from usaepay.create_transaction call
     :param sm: SQLAlchemy sessionmaker object
     """
-    print("committing invoice...")
 
     invoice.txn_key = res["key"]
     invoice.txn_resultcode = usaepay.APPROVED

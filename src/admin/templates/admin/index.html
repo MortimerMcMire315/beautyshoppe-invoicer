@@ -1,11 +1,18 @@
 {% extends 'admin/master.html' %}
+{% block head %}
+<script src="{{url_for('static', filename='jquery-3.4.1.min.js')}}"></script>
+<script src="{{url_for('static', filename='process-invoices.js')}}"></script>
+{% endblock head %}
+
 {% block body %}
 {{ super() }}
 <div class="row-fluid">
 
     <div>
         {% if current_user.is_authenticated %}
-        <h1>Automatic ACH payment processing</h1>
+            <h1>Automatic ACH payment processing</h1>
+            <a id="process-invoices" class="btn btn-default" href="/process-invoices/">Process Invoices</a>
+            <div id="processing-log"></div>
         {% else %}
         <form method="POST" action="">
             {{ form.hidden_tag() if form.hidden_tag }}

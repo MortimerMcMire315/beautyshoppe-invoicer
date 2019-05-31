@@ -133,8 +133,9 @@ def add_or_overwrite_invoice(record, db_sess):
     :param record: Invoice dict from Nexudus API call
     :param db_sess: DB Session
     """
+
     # First, determine if the corresponding member is set to process
-    # automatically. If not, we have nothing to do here; just short-circuit.
+    # automatically. If not, we will ignore this invoice; just short-circuit.
     try:
         corresponding_member = db_sess.query(models.Member).\
             filter_by(nexudus_user_id=record["CoworkerId"]).one_or_none()
@@ -143,7 +144,7 @@ def add_or_overwrite_invoice(record, db_sess):
             return
 
     except MultipleResultsFound as e:
-        logger = logging.getLogger('invoicere')
+        logger = logging.getLogger('invoicer_db')
         logger.warn('Consistency warning: Multiple users in database ' +
                     'with Nexudus ID ' + str(record["CoworkerId"]) + ".")
 
@@ -151,7 +152,7 @@ def add_or_overwrite_invoice(record, db_sess):
         invoice_to_add = db_sess.query(models.Invoice).\
             filter_by(nexudus_invoice_id=record["Id"]).one_or_none()
     except MultipleResultsFound as e:
-        logger = logging.getLogger('invoicer')
+        logger = logging.getLogger('invoicer_db')
         logger.warn('Consistency warning: Multiple invoices in database '
                     'session with Nexudus ID ' + str(record["Id"]) +
                     '. Removing all copies of this user and re-syncing.')
@@ -171,10 +172,15 @@ def add_or_overwrite_invoice(record, db_sess):
         invoice_to_add.finalized = False
         invoice_to_add.txn_id = None
         invoice_to_add.txn_status = "Not processed"
+        invoice_to_add.txn_statuscode = None
 
         db_sess.add(invoice_to_add)
-        flask_logger = logging.getLogger('flask.app')
-        flask_logger.debug("Syncing " + str(invoice_to_add.nexudus_invoice_id))
+        ajax_logger = logging.getLogger('invoicer_ajax')
+        ajax_logger.debug(
+            "    New invoice found for Nexudus user ID " +
+            str(invoice_to_add.nexudus_user_id) +
+            "."
+        )
 
         db_sess.commit()
 
@@ -195,7 +201,7 @@ def add_or_overwrite_member(record, db_sess):
         member_to_add = db_sess.query(models.Member).\
             filter_by(nexudus_user_id=record["Id"]).one_or_none()
     except MultipleResultsFound as e:
-        logger = logging.getLogger('invoicer')
+        logger = logging.getLogger('invoicer_db')
         logger.warn('Consistency warning: Multiple users in database session '
                     'with Nexudus ID ' + str(record["Id"]) + '. Removing all '
                     'copies of this user and re-syncing.')

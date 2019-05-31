@@ -20,6 +20,7 @@ import time
 import logging
 import datetime
 
+import flask
 from sqlalchemy.exc import SQLAlchemyError
 
 from . import models
@@ -51,3 +52,14 @@ class SQLALogHandler(logging.Handler):
         except SQLAlchemyError as e:
             print("Fatal error: Could not log to database:")
             print(e)
+
+class AJAXLogHandler(logging.Handler):
+    """Stores data in the Flask Application Context."""
+
+    def emit(self, record):
+        """Add to the log queue"""
+        line = '\n' + record.msg
+        if 'logqueue' in flask.g:
+            flask.g.logqueue += line
+        else:
+            flask.g.logqueue = line

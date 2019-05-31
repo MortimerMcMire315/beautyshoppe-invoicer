@@ -16,7 +16,8 @@ with nexudus-usaepay-gateway.  If not, see
 <https://www.gnu.org/licenses/>.
 """
 
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect
+import flask
 
 from flask_apscheduler import APScheduler
 from flask_admin import Admin
@@ -86,12 +87,22 @@ def admin_setup(app):
     return db_session
 
 
-def error_page_setup(app):
+def app_setup(app, db_session):
     """Define error pages for the Flask app."""
     @app.errorhandler(500)
     def serverError(error):
         print("500 error:")
         print(traceback.format_exc())
+
+    @app.route('/process-invoices/')
+    def process_invoices():
+        invoicer.run()
+        return flask.Response(flask.g.get('logqueue', ''), mimetype='text/plain')
+
+    @app.teardown_request
+    def teardown_request(*args, **kwargs):
+        db_session.expire_all()
+        db_session.close()
 
 
 def scheduler_setup(app):
@@ -106,10 +117,13 @@ def log_setup(app, db_session):
     """Set up a database logger for our invoicer system."""
     # Set log level
     logging.basicConfig(level=logging.DEBUG)
-    invoice_logger = logging.getLogger('invoicer')
+    db_logger = logging.getLogger('invoicer_db')
     # Add custom log handler to log directly to DB
-    invoice_logger.addHandler(loghandler.SQLALogHandler(db_session))
-    return invoice_logger
+    db_logger.addHandler(loghandler.SQLALogHandler(db_session))
+
+    ajax_logger = logging.getLogger('invoicer_ajax')
+    ajax_logger.addHandler(loghandler.AJAXLogHandler())
+    return db_logger
 
 
 def init():
@@ -126,12 +140,11 @@ def init():
 
     # Set up logging - get database session and pass it into the log setup so
     # that logs can go directly to DB
-    invoice_logger = log_setup(app, db_session)
+    log_setup(app, db_session)
 
-    # Add error page configurations
-    error_page_setup(app)
+    # Add page configurations
+    app_setup(app, db_session)
 
-    invoicer.run(True)
     # Start APScheduler jobs
     scheduler = scheduler_setup(app)
 
