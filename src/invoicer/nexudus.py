@@ -19,6 +19,8 @@ with nexudus-usaepay-gateway.  If not, see
 import logging
 import sys
 import pprint
+import string
+import random
 import datetime
 
 import requests
@@ -29,13 +31,17 @@ from sqlalchemy.orm.exc import MultipleResultsFound
 from .. import config
 from ..db import models, conn
 
+class MultipleResultsFoundException(Exception):
+    pass
 
-def get_records(url_part, payload):
+
+def get_records(url_part, payload, single=False):
     """
     Generator which GETs Nexudus records and yields batches of records.
 
     :param url_part: Nexudus API URL - everything after "/api/".
     :param payload: GET variables to send along with API request
+    :param single: True if we should only have a single record. Throws an exception if more than one result is returned.
     :returns: Yields a batch of records (list of dicts).
     :raises: TODO
     """
@@ -52,9 +58,29 @@ def get_records(url_part, payload):
 
         # TODO handle request errors
         res = r.json()
+
+        if single:
+            if int(res["TotalItems"]) != 1:
+                raise MultipleResultsFoundException
+
         has_next_page = res["HasNextPage"]
 
         yield res["Records"]
+
+
+def create_record(url_part, payload):
+    """
+    Send a POST request to Nexudus, creating a single record.
+
+    :param url_part: Nexudus API URL - everything after "/api/".
+    :param payload: Variables to send along with API request.
+    """
+    url = config.NEXUDUS_API_URL + url_part
+    creds = (config.NEXUDUS_EMAIL, config.NEXUDUS_PASS)
+    params = payload
+
+    r = requests.post(url, data=params, auth=creds)
+    return r.json()
 
 
 def process_onebyone(url_part, callback, payload={}):
@@ -101,6 +127,19 @@ def get_first(url_part, payload={}):
     return next(g)[0]
 
 
+def get_single(url_part, payload={}):
+    """
+    Make a Nexudus GET request and return only the first result.
+
+    :param url_part: Nexudus API URL - everything after "/api".
+    :param payload: GET variables to send along with API request. Default
+                    empty.
+    """
+
+    g = get_records(url_part, payload, single=True)
+    return next(g)[0]
+
+
 def get_invoice_list():
     """Print a list of unpaid invoices."""
     payload = {
@@ -117,6 +156,59 @@ def get_invoice_list():
         payload
     )
 
+
+def mark_invoice_paid(invoice_id):
+    """
+    Mark an invoice as paid in Nexudus.
+
+    :param invoice_id: ID of the invoice
+    :returns: (result (bool), message)
+    """
+
+    get_payload = {
+        "CoworkerInvoice_Id" : invoice_id
+    }
+
+    try:
+        nexudus_invoice = get_single('billing/coworkerinvoices', get_payload)
+
+    except MultipleResultsFoundException as e:
+        return (False, str(e))
+
+    # Nexudus requires the first 10 fields here in order for us to do anything
+    # with the invoice.
+
+    pp = pprint.PrettyPrinter(indent=4)
+    # pp.pprint(nexudus_invoice)
+
+    code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+
+    create_payload = {
+        "CoworkerInvoiceId": invoice_id,
+        "CoworkerId": nexudus_invoice["CoworkerId"],
+        "BusinessId": nexudus_invoice["BusinessId"],
+        # "InvoiceNumber": nexudus_invoice["InvoiceNumber"],
+        # "BillToName": nexudus_invoice["BillToName"],
+        # "BillToAddress": nexudus_invoice["BillToAddress"],
+        # "BillToCity": nexudus_invoice["BillToCity"],
+        # "BillToPostCode": nexudus_invoice["BillToPostCode"],
+        # "BillToCountryId": nexudus_invoice["BillToCountryId"],
+        # "CurrencyId": nexudus_invoice["CurrencyId"],
+        "Code": code,
+        # "PaymentGatewayName": 6,
+        "Credit": nexudus_invoice["TotalAmount"],
+        "Description": "Automatic USAePay payment"
+    }
+
+    # pp.pprint(create_payload)
+
+    r = create_record('billing/coworkerledgerentries', create_payload)
+    sys.stdout.flush()
+
+    if r.get("WasSuccessful"):
+        return (True, "Successfully updated invoice in Nexudus.")
+    else:
+        return (False, r.get("Message"))
 
 def add_or_overwrite_invoice(record, db_sess):
     """

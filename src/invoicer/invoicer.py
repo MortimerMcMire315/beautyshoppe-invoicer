@@ -51,10 +51,8 @@ def run():
     ajax_logger.info(">>> Getting unpaid invoices from Nexudus...")
     nexudus.sync_invoice_table(sm)
     charge_unpaid_invoices(sm)
-
-    # TODO check approved, pending invoices for acceptance
     check_txn_statuses(sm)
-
+    finalize_invoices(sm)
 
 def charge_unpaid_invoices(sm):
     """
@@ -157,6 +155,49 @@ def charge_single_invoice(invoice, db_sess):
 
     except HTTPError as e:
         logger.error("CRITICAL: Request to USAePay failed. Message: " + str(e))
+
+
+def finalize_invoice(invoice, db_sess):
+    """
+    Inform Nexudus that one invoice has been paid.
+
+    If successful, mark the invoice as finalized in our database.
+
+    :param invoice: models.Invoice object
+    :param db_sess: SQLAlchemy database session object
+    """
+    logger = logging.getLogger('invoicer_ajax')
+    result, msg = nexudus.mark_invoice_paid(invoice.nexudus_invoice_id)
+
+    if result:
+        invoice.finalized = True
+        db_sess.commit()
+        logger.error("    Successfully updated invoice %s in Nexudus." %
+                     invoice.nexudus_invoice_id)
+    else:
+        logger.error("    Could not mark invoice %s paid in Nexudus! Error: %s" %
+                     (invoice.nexudus_invoice_id, msg))
+
+
+def finalize_invoices(sm):
+    """
+    Inform Nexudus of all settled invoices.
+
+    :param sm: SQLAlchemy sessionmaker object
+    """
+    logger = logging.getLogger('invoicer_ajax')
+    logger.info(">>> Submitting paid invoices to USAePay...")
+
+    db_sess = sm()
+
+    # Get all settled, unfinalized invoices.
+    settled_unfinalized_invoices = db_sess.query(Invoice).\
+        filter_by(txn_statuscode=usaepay.STATUS_SETTLED).\
+        filter_by(finalized=False).\
+        all()
+
+    for invoice in settled_unfinalized_invoices:
+        finalize_invoice(invoice, db_sess)
 
 
 def mark_transaction_status(invoice, db_sess):
