@@ -26,7 +26,25 @@ import requests
 
 from .. import config
 
-APPROVED = "A"
+# Documentation: https://web.archive.org/web/20190611191118/https://help.usaepay.info/developer/reference/transactioncodes/
+
+RESULT_APPROVED = "A"
+RESULT_DECLINED = "D"
+RESULT_PENDING = "P"
+RESULT_ERROR = "E"
+RESULT_VERIFICATION = "V"
+STATUS_NEW = "N"
+STATUS_PENDING = "P"
+STATUS_SUBMITTED = "B"
+STATUS_FUNDED = "F"
+STATUS_SETTLED = "S"
+STATUS_ERROR = "E"
+STATUS_VOIDED = "V"
+STATUS_RETURNED = "R"
+STATUS_TIMEDOUT = "T"
+STATUS_ONHOLD_MANAGER = "M"
+STATUS_ONHOLD_PROCESSOR = "H"
+
 
 def debug_api_request(seed, prehash, apihash):
     """
@@ -85,11 +103,11 @@ def api_request(api_url, payload=None, reqtype='POST'):
 
     if payload is None:
         r = reqfunc(config.USAEPAY_API_URL + api_url,
-                          auth=creds)
+                    auth=creds)
     else:
         r = reqfunc(config.USAEPAY_API_URL + api_url,
-                       auth=creds,
-                       json=payload)
+                    auth=creds,
+                    json=payload)
     return r
 
 
@@ -98,7 +116,10 @@ def create_transaction(invoice):
     Create a USAePay charge based on the given invoice.
 
     :param invoice: models.Invoice object
-    :return: TODO
+    :return: USAePay JSON response object. Example:
+                {
+
+                }
     """
     payload = {
         'command': 'check:sale',
@@ -117,7 +138,41 @@ def create_transaction(invoice):
 
 def get_transaction_status(txn_key):
     """
+    Get the status of a past transaction.
 
+    :param txn_key: Transaction key previously stored in the Invoice table
+    :return: Python dictionary mapping of the USAePay JSON response object.
+             Example response:
+                {
+                    "type": "transaction",
+                    "key": "5nft7t7vzx1277g",
+                    "refnum": "3103559243",
+                    "created": "2019-05-31 07:37:28",
+                    "trantype_code": "K",
+                    "trantype": "Check Sale",
+                    "result_code": "A",
+                    "result": "Approved",
+                    "authcode": "TM6568",
+                    "status_code": "S",
+                    "status": "Settled",
+                    "check": {
+                        "accountholder": "Seth Yoder",
+                        "checknum": "",
+                        "trackingnum": "19053159313448",
+                        "effective": "2019-06-03",
+                        "processed": "2019-05-31",
+                        "settled": "2019-06-01",
+                        "returned": None,
+                        "banknote": None
+                    },
+                    "amount": "2.00",
+                    "amount_detail": {
+                        "tip": "0.00",
+                        "tax": "0.00",
+                        "shipping": "0.00",
+                        "discount": "0.00"
+                    }
+                }
     """
 
     r = api_request('/transactions/' + txn_key, reqtype='GET')

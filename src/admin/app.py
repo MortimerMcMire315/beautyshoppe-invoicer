@@ -88,7 +88,7 @@ def admin_setup(app):
 
 
 def app_setup(app, db_session):
-    """Define error pages for the Flask app."""
+    """Define pages for the Flask app."""
     @app.errorhandler(500)
     def serverError(error):
         print("500 error:")

@@ -20,6 +20,7 @@ import logging
 import sys
 
 import flask
+from requests.exceptions import HTTPError
 from sqlalchemy import or_, and_
 
 from . import nexudus
@@ -52,7 +53,7 @@ def run():
     charge_unpaid_invoices(sm)
 
     # TODO check approved, pending invoices for acceptance
-    check_invoice_approvals(sm)
+    check_txn_statuses(sm)
 
 
 def charge_unpaid_invoices(sm):
@@ -101,16 +102,10 @@ def charge_unpaid_invoices(sm):
             "... Sending new transaction to USAePay"
         )
 
-        res = usaepay.create_transaction(invoice)
-
-        if res["result_code"] != usaepay.APPROVED:
-            log_transaction_exception(res["result_code"], res["error"])
-        else:
-            print(res)
-            mark_transaction_status(invoice, res, db_sess)
+        charge_single_invoice(invoice, db_sess)
 
 
-def check_invoice_approvals(sm):
+def check_txn_statuses(sm):
     """
     Check if any "Approved" invoices have been submitted to the bank.
 
@@ -120,15 +115,58 @@ def check_invoice_approvals(sm):
     db_sess = sm()
     logger = logging.getLogger('invoicer_ajax')
 
-
     approved_invoices = db_sess.query(Invoice).\
         filter(Invoice.member.has(process_automatically=True)).\
-        filter_by(txn_resultcode='A').all()
+        filter_by(txn_resultcode=usaepay.RESULT_APPROVED).\
+        filter(Invoice.txn_statuscode != usaepay.STATUS_SETTLED).\
+        all()
 
-    if len(approved_invoices) != 0:
-        logger.info(">>> Checking for settled transactions...")
+    logger.info(">>> Checking for settled transactions...")
 
     for invoice in approved_invoices:
+        mark_transaction_status(invoice, db_sess)
+
+
+def log_transaction_exception(result_code, result):
+    """
+    Mark transaction status and log the error.
+    TODO
+    """
+    print(result)
+
+
+def charge_single_invoice(invoice, db_sess):
+    """
+
+    :param invoice: models.Invoice object
+    :param db_sess: SQLAlchemy database session object
+    """
+    res = usaepay.create_transaction(invoice)
+    logger = logging.getLogger('invoicer_ajax')
+
+    try:
+        if res["result_code"] != usaepay.APPROVED:
+            log_transaction_exception(res["result_code"], res["error"])
+
+        invoice.txn_key = res["key"]
+        invoice.txn_resultcode = usaepay.APPROVED
+        invoice.txn_result = "Approved"
+
+    except KeyError as e:
+        logger.error("Key %s not found in USAePay response!" % str(e))
+
+    except HTTPError as e:
+        logger.error("CRITICAL: Request to USAePay failed. Message: " + str(e))
+
+
+def mark_transaction_status(invoice, db_sess):
+    """
+
+    :param invoice: models.Invoice object
+    :param db_sess: SQLAlchemy database session object
+    """
+    logger = logging.getLogger('invoicer_ajax')
+    try:
         # TODO run USAePay check
         logger.info(
             "    Checking transaction status for " +
@@ -136,32 +174,21 @@ def check_invoice_approvals(sm):
             " (Invoice ID " + str(invoice.nexudus_invoice_id) + ")"
             "..."
         )
+        status_dict = usaepay.get_transaction_status(invoice.txn_key)
+        invoice.txn_statuscode = status_dict["status_code"]
+        invoice.txn_status = status_dict["status"]
+
         logger.info(
             "    USAePay Transaction "
             + str(invoice.txn_key)
-            + " pending."
+            + ": "
+            + str(invoice.txn_status)
         )
 
-def log_transaction_exception(result_code, result):
-    """
-    Mark transaction status and log the error.
-    """
-    print(result)
+        db_sess.commit()
 
+    except KeyError as e:
+        logger.error("Key %s not found in USAePay response!" % str(e))
 
-def mark_transaction_status(invoice, res, db_sess):
-    """
-
-    :param invoice: models.Invoice object
-    :param res: JSON response from usaepay.create_transaction call
-    :param sm: SQLAlchemy sessionmaker object
-    """
-
-    invoice.txn_key = res["key"]
-    invoice.txn_resultcode = usaepay.APPROVED
-    invoice.txn_result = "Approved"
-    status_dict = usaepay.get_transaction_status(invoice.txn_key)
-    invoice.txn_statuscode = status_dict["status_code"]
-    invoice.txn_status = status_dict["status"]
-
-    db_sess.commit()
+    except HTTPError as e:
+        logger.error("CRITICAL: Request to USAePay failed. Message: " + str(e))
