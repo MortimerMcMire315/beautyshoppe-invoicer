@@ -343,42 +343,41 @@ def add_or_overwrite_member(record, db_sess):
     db_sess.commit()
 
 
-def sync_table(sm, sync_callback, payload, business_var, url_part):
+def sync_table(sm, nexudus_space_id, sync_callback, payload, url_part, business_var=None):
     """
     Update a local table using records from the Nexudus database.
 
     :param sm: SQLAlchemy SessionMaker
+    :param nexudus_space_id: ID of the Nexudus space we are currently
+                             processing records for.
     :param sync_callback: The "add_or_overwrite" callback that is used to
         synchronize individual records
     :param payload: GET payload dict for API request
+    :param url_part: Nexudus API URL, e.g. 'spaces/coworkers'
     :param business_var: Nexudus API variable to cross-reference with the
         Space, e.g. CoworkerInvoice_Business or Coworker_InvoicingBusiness
-    :param url_part: Nexudus API URL, e.g. 'spaces/coworkers'
     """
     db_sess = sm()
 
     def callback(records):
         for record in records:
-            member = sync_callback(record, db_sess)
+            sync_callback(record, db_sess)
 
     # It is important that we only grab coworkers from the spaces we actually
     # want to manage. If we don't do this, coworkers will be pulled from all
     # spaces that this account has access to.
 
-    spaces = config.NEXUDUS_SPACE_IDS
-    if spaces:
-        for space in spaces:
-            payload[business_var] = space
-            process_batch(url_part, callback, payload)
-    else:
-        process_batch(url_part, callback, payload)
+    payload[business_var] = nexudus_space_id
+    process_batch(url_part, callback, payload)
 
 
-def sync_member_table(sm):
+def sync_member_table(sm, nexudus_space_id):
     """
     Fill local Member table with records from the Nexudus database.
 
     :param sm: Database sessionmaker
+    :param nexudus_space_id: ID of the Nexudus space we are currently
+                             processing members for.
     """
     payload = {
         'Coworker_Active': 'true',
@@ -387,18 +386,21 @@ def sync_member_table(sm):
 
     sync_table(
         sm,
+        nexudus_space_id,
         add_or_overwrite_member,
         payload,
+        'spaces/coworkers',
         'Coworker_InvoicingBusiness',
-        'spaces/coworkers'
     )
 
 
-def sync_invoice_table(sm):
+def sync_invoice_table(sm, nexudus_space_id):
     """
     Fill local Invoice table with records from the Nexudus database.
 
     :param sm: Database sessionmaker
+    :param nexudus_space_id: ID of the Nexudus space we are currently
+                             processing members for.
     """
     # Only pull unpaid invoices.
     payload = {
@@ -408,8 +410,9 @@ def sync_invoice_table(sm):
 
     sync_table(
         sm,
+        nexudus_space_id,
         add_or_overwrite_invoice,
         payload,
+        'billing/coworkerinvoices',
         'CoworkerInvoice_Business',
-        'billing/coworkerinvoices'
     )

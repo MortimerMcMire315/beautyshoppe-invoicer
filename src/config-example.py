@@ -39,8 +39,9 @@ NEXUDUS_API_URL = "https://spaces.nexudus.com/api/"
 # certain spaces.
 #
 # To find your space ID, log into spaces.nexudus.com, select a space, and check
-# the page source. then CTRL-F for the string "businessId". The ID listed in
-# the javascript is the ID for the space that you're currently managing.
+# the page source (CTRL-U in Chrome). then CTRL-F for "businessId".  The ID
+# listed in the javascript is the ID for the space that you're currently
+# managing.
 #
 # To restrict to a single space, just use a single string in a list, like
 # ["12345678"]

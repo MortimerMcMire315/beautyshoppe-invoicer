@@ -18,7 +18,7 @@ with nexudus-usaepay-gateway.  If not, see
 
 from wtforms import form, fields, validators
 from flask import url_for, redirect, render_template, request
-from flask_admin import AdminIndexView, expose, helpers
+from flask_admin import AdminIndexView, BaseView, expose, helpers
 
 from ..invoicer import nexudus
 from ..db import models
@@ -47,7 +47,7 @@ class MyAdminIndexView(AdminIndexView):
     """
     Overrides default admin view to enforce login.
 
-    The index view will redirec to /login if the user is not authenticated.
+    The index view will redirect to /login if the user is not authenticated.
     """
 
     @expose('/')
@@ -78,6 +78,13 @@ class MyAdminIndexView(AdminIndexView):
         login.logout_user()
         return redirect(url_for('.index'))
 
+class ReportsView(BaseView):
+    @expose('/')
+    def index(self):
+        if not login.current_user.is_authenticated:
+            return redirect('/admin/login')
+        form = ReportForm()
+        return self.render('report.html', form=form)
 
 class LoginForm(form.Form):
     """Simple login form calling nexudus.authAPIUser."""
@@ -96,6 +103,9 @@ class LoginForm(form.Form):
         """Try authenticating the user."""
         return authAPIUser(self.login.data, self.password.data)
 
+class ReportForm(form.Form):
+    from_date = fields.DateField('Searching for reports between', format='%Y-%m-%d')
+    to_date = fields.DateField('and', format='%Y-%m-%d')
 
 def authAPIUser(email, password):
     """

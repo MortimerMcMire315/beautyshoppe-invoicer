@@ -49,6 +49,7 @@ class Invoice(Base):
     id = Column(Integer, primary_key=True)
     nexudus_invoice_id = Column(BigInteger)
     nexudus_user_id = Column(BigInteger, ForeignKey('member.nexudus_user_id'))
+    nexudus_space_id = Column(BigInteger)
     time_created = Column(DateTime)
     amount = Column(DECIMAL(precision=10, scale=2))
     finalized = Column(Boolean)

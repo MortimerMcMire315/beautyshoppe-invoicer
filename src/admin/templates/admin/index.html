@@ -12,6 +12,7 @@
         {% if current_user.is_authenticated %}
             <a id="process-invoices" class="btn btn-default" href="/process-invoices/">Process Invoices</a>
             <div id="processing-log"></div>
+
         {% else %}
         <form method="POST" action="">
             {{ form.hidden_tag() if form.hidden_tag }}

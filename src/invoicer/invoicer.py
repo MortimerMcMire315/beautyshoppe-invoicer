@@ -25,17 +25,41 @@ from sqlalchemy import or_, and_
 
 from . import nexudus
 from . import usaepay
+from .. import config
 from ..db import conn, models
 from ..db.models import Invoice, Member
 
+manually_initiated=False
 
-def run():
+def log_message(msg, level=logging.INFO):
+    """
+    Log something to the database or to the web frontend.
+
+    :param msg: The string to log.
+    :param level: debug, info, warning, error, critical
+    """
+    global manually_initiated
+
+    if manually_initiated:
+        logger = logging.getLogger('invoicer_ajax')
+    else:
+        logger = logging.getLogger('invoicer_db')
+
+    logger.log(level, msg)
+
+
+def run(manual=False):
     """
     Establish a connection to Nexudus and processes any new invoices.
+
+    :param manual: True if the user initiated this run from the web
+                   interface.
     """
-    # Get logger and tell it we're doing something
-    ajax_logger = logging.getLogger('invoicer_ajax')
-    ajax_logger.info("Running...")
+
+    global manually_initiated
+    manually_initiated = manual
+
+    log_message("Running...")
 
     # db_logger = logging.getLogger('invoicer_db')
     # db_logger.info("Running...")
@@ -43,18 +67,78 @@ def run():
     # Connect to Nexudus
     sm = conn.get_db_sessionmaker()
 
-    # TODO clean up members that are no longer active first
-    # ajax_logger.info(">>> Syncing member table...")
-    # nexudus.sync_member_table(sm)
+    # Perform this entire process for each nexudus space that we want to
+    # manage.
+    for nexudus_space_id in config.NEXUDUS_SPACE_USAEPAY_MAP:
+        log_message("For Nexudus space " + str(nexudus_space_id) + ":")
 
-    # TODO clean up invoices that have been paid first
-    ajax_logger.info(">>> Getting unpaid invoices from Nexudus...")
-    nexudus.sync_invoice_table(sm)
-    charge_unpaid_invoices(sm)
-    check_txn_statuses(sm)
-    finalize_invoices(sm)
+        # TODO maybe clean up members that are no longer active first
+        log_message(">>> Syncing member table...")
+        nexudus.sync_member_table(sm, nexudus_space_id)
 
-def charge_unpaid_invoices(sm):
+        # TODO maybe clean up invoices that have been paid first
+        log_message(">>> Getting unpaid invoices from Nexudus...")
+        nexudus.sync_invoice_table(sm, nexudus_space_id)
+
+        log_message(">>> Checking for new transactions to send to USAePay...")
+        charge_unpaid_invoices(sm, nexudus_space_id)
+
+        log_message(">>> Checking for settled transactions...")
+        check_txn_statuses(sm, nexudus_space_id)
+
+        log_message(">>> Submitting paid invoices to Nexudus...")
+        finalize_invoices(sm)
+
+
+def get_usaepay_api_creds(nexudus_space_id):
+    """
+    Get the API key we will be using to connect to USAePay.
+
+    :param nexudus_space_id: ID of the Nexudus space we are currently
+                             processing records for.
+    :returns: (api_key, api_pin)
+    """
+    try:
+        api_key = config.NEXUDUS_SPACE_USAEPAY_MAP[nexudus_space_id]["api_key"]
+        api_pin = config.NEXUDUS_SPACE_USAEPAY_MAP[nexudus_space_id]["api_pin"]
+        return (api_key, api_pin)
+    except KeyError as e:
+        log_message("Invalid configuration: NEXUDUS_SPACE_USAEPAY_MAP is not "
+                    "set up correctly in the config file. Check the "
+                    "config-example.py file for reference.",
+                    logging.ERROR)
+        raise
+
+
+def charge_single_invoice(invoice, db_sess, nexudus_space_id):
+    """
+
+    :param invoice: models.Invoice object
+    :param db_sess: SQLAlchemy database session object
+    :param nexudus_space_id: ID of the Nexudus space we are currently
+                             processing records for.
+    """
+    creds = get_usaepay_api_creds(nexudus_space_id)
+
+    try:
+        res = usaepay.create_transaction(invoice, creds)
+        if res["result_code"] != usaepay.RESULT_APPROVED:
+            log_transaction_exception(res["result_code"], res["error"])
+
+        invoice.txn_key = res["key"]
+        invoice.txn_resultcode = usaepay.RESULT_APPROVED
+        invoice.txn_result = "Approved"
+
+    except KeyError as e:
+        log_message("Key %s not found in USAePay response!" % str(e),
+                    logging.ERROR)
+
+    except HTTPError as e:
+        log_message("CRITICAL: Request to USAePay failed. Message: " + str(e),
+                    logging.ERROR)
+
+
+def charge_unpaid_invoices(sm, nexudus_space_id):
     """
     Run unpaid invoices in our database through USAePay.
 
@@ -63,20 +147,24 @@ def charge_unpaid_invoices(sm):
     will have some txn_status.
 
     :param sm: SQLAlchemy sessionmaker object
+    :param nexudus_space_id: ID of the Nexudus space we are currently
+                             processing records for.
     """
     db_sess = sm()
-    logger = logging.getLogger('invoicer_ajax')
 
     # Only try to pay invoices if the corresponding Member is set to be
     # processed automatically AND the invoice does not yet have a transaction
     # status AND the member has account/routing information.
     unsent_invoices = db_sess.query(Invoice).\
         filter(
+            Invoice.nexudus_space_id == nexudus_space_id
+        ).\
+        filter(
             Invoice.member.has(process_automatically=True)
         ).\
         filter(
             and_(
-                Invoice.member.has(Member.account_number != None),
+                Invoice.member.has(Member.account_number != None),  # noqa
                 Invoice.member.has(Member.account_number != ''),
                 Invoice.member.has(Member.routing_number != None),
                 Invoice.member.has(Member.routing_number != '')
@@ -89,40 +177,40 @@ def charge_unpaid_invoices(sm):
             )
         ).all()
 
-    logger.info(">>> Checking for new transactions to send to USAePay...")
-
     if len(unsent_invoices) == 0:
-        logger.info("    No new transactions sent.")
+        log_message("    No new transactions sent.")
 
     for invoice in unsent_invoices:
-        logger.info(
+        log_message(
             "    Processing invoice for " + str(invoice.member) +
             "... Sending new transaction to USAePay"
         )
 
-        charge_single_invoice(invoice, db_sess)
+        charge_single_invoice(invoice, db_sess, nexudus_space_id)
 
 
-def check_txn_statuses(sm):
+def check_txn_statuses(sm, nexudus_space_id):
     """
     Check if any "Approved" invoices have been submitted to the bank.
 
     :param sm: SQLAlchemy sessionmaker object
+    :param nexudus_space_id: ID of the Nexudus space we are currently
+                             processing records for.
     """
 
     db_sess = sm()
-    logger = logging.getLogger('invoicer_ajax')
-
     approved_invoices = db_sess.query(Invoice).\
+        filter(Invoice.nexudus_space_id == nexudus_space_id).\
         filter(Invoice.member.has(process_automatically=True)).\
         filter_by(txn_resultcode=usaepay.RESULT_APPROVED).\
         filter(Invoice.txn_statuscode != usaepay.STATUS_SETTLED).\
         all()
 
-    logger.info(">>> Checking for settled transactions...")
+    if len(approved_invoices) == 0:
+        log_message("    No Approved, not-Settled transactions found.")
 
     for invoice in approved_invoices:
-        mark_transaction_status(invoice, db_sess)
+        mark_transaction_status(invoice, db_sess, nexudus_space_id)
 
 
 def log_transaction_exception(result_code, result):
@@ -131,30 +219,6 @@ def log_transaction_exception(result_code, result):
     TODO
     """
     print(result)
-
-
-def charge_single_invoice(invoice, db_sess):
-    """
-
-    :param invoice: models.Invoice object
-    :param db_sess: SQLAlchemy database session object
-    """
-    res = usaepay.create_transaction(invoice)
-    logger = logging.getLogger('invoicer_ajax')
-
-    try:
-        if res["result_code"] != usaepay.APPROVED:
-            log_transaction_exception(res["result_code"], res["error"])
-
-        invoice.txn_key = res["key"]
-        invoice.txn_resultcode = usaepay.APPROVED
-        invoice.txn_result = "Approved"
-
-    except KeyError as e:
-        logger.error("Key %s not found in USAePay response!" % str(e))
-
-    except HTTPError as e:
-        logger.error("CRITICAL: Request to USAePay failed. Message: " + str(e))
 
 
 def finalize_invoice(invoice, db_sess):
@@ -166,17 +230,18 @@ def finalize_invoice(invoice, db_sess):
     :param invoice: models.Invoice object
     :param db_sess: SQLAlchemy database session object
     """
-    logger = logging.getLogger('invoicer_ajax')
     result, msg = nexudus.mark_invoice_paid(invoice.nexudus_invoice_id)
 
     if result:
         invoice.finalized = True
         db_sess.commit()
-        logger.error("    Successfully updated invoice %s in Nexudus." %
-                     invoice.nexudus_invoice_id)
+        log_message("    Successfully updated invoice %s in Nexudus."
+                    % invoice.nexudus_invoice_id,
+                    logging.INFO)
     else:
-        logger.error("    Could not mark invoice %s paid in Nexudus! Error: %s" %
-                     (invoice.nexudus_invoice_id, msg))
+        log_message("    Could not mark invoice %s paid in Nexudus! Error: %s"
+                    % (invoice.nexudus_invoice_id, msg),
+                    logging.ERROR)
 
 
 def finalize_invoices(sm):
@@ -185,9 +250,6 @@ def finalize_invoices(sm):
 
     :param sm: SQLAlchemy sessionmaker object
     """
-    logger = logging.getLogger('invoicer_ajax')
-    logger.info(">>> Submitting paid invoices to USAePay...")
-
     db_sess = sm()
 
     # Get all settled, unfinalized invoices.
@@ -200,26 +262,25 @@ def finalize_invoices(sm):
         finalize_invoice(invoice, db_sess)
 
 
-def mark_transaction_status(invoice, db_sess):
+def mark_transaction_status(invoice, db_sess, nexudus_space_id):
     """
 
     :param invoice: models.Invoice object
     :param db_sess: SQLAlchemy database session object
     """
-    logger = logging.getLogger('invoicer_ajax')
+    usaepay_creds = get_usaepay_api_creds(nexudus_space_id)
     try:
-        # TODO run USAePay check
-        logger.info(
+        log_message(
             "    Checking transaction status for " +
             str(invoice.member) +
             " (Invoice ID " + str(invoice.nexudus_invoice_id) + ")"
             "..."
         )
-        status_dict = usaepay.get_transaction_status(invoice.txn_key)
+        status_dict = usaepay.get_transaction_status(invoice.txn_key, usaepay_creds)
         invoice.txn_statuscode = status_dict["status_code"]
         invoice.txn_status = status_dict["status"]
 
-        logger.info(
+        log_message(
             "    USAePay Transaction "
             + str(invoice.txn_key)
             + ": "
@@ -229,7 +290,9 @@ def mark_transaction_status(invoice, db_sess):
         db_sess.commit()
 
     except KeyError as e:
-        logger.error("Key %s not found in USAePay response!" % str(e))
+        log_message("Key %s not found in USAePay response!" % str(e),
+                    logging.ERROR)
 
     except HTTPError as e:
-        logger.error("CRITICAL: Request to USAePay failed. Message: " + str(e))
+        log_message("CRITICAL: Request to USAePay failed. Message: " + str(e),
+                    logging.ERROR)

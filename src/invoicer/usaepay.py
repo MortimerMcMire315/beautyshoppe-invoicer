@@ -73,7 +73,7 @@ def debug_api_request(seed, prehash, apihash):
     sys.stdout.flush()
 
 
-def api_request(api_url, payload=None, reqtype='POST'):
+def api_request(api_url, creds, payload=None, reqtype='POST'):
     """
     Send a request to USAePay's REST API.
 
@@ -82,15 +82,18 @@ def api_request(api_url, payload=None, reqtype='POST'):
         https://help.usaepay.info/developer/rest-api/changelog/
 
     :param api_url: URL fragment (e.g. '/transactions')
+    :param creds: Tuple of strings: (api_key, api_pin)
     :param payload: Data to send in JSON format
     :return: TODO
     """
-    seed = ''.join(random.choices(string.ascii_letters, k=10))
+    apikey = creds[0]
+    apipin = creds[1]
 
-    prehash = config.USAEPAY_API_KEY + seed + config.USAEPAY_API_PIN
+    seed = ''.join(random.choices(string.ascii_letters, k=10))
+    prehash = apikey + seed + apipin
     apihash = 's2/' + seed + '/' +\
         hashlib.sha256(prehash.encode('utf-8')).hexdigest()
-    creds = (config.USAEPAY_API_KEY, apihash)
+    hashcreds = (apikey, apihash)
 
     # debug_api_request(seed, prehash, apihash)
 
@@ -103,23 +106,21 @@ def api_request(api_url, payload=None, reqtype='POST'):
 
     if payload is None:
         r = reqfunc(config.USAEPAY_API_URL + api_url,
-                    auth=creds)
+                    auth=hashcreds)
     else:
         r = reqfunc(config.USAEPAY_API_URL + api_url,
-                    auth=creds,
+                    auth=hashcreds,
                     json=payload)
     return r
 
 
-def create_transaction(invoice):
+def create_transaction(invoice, creds):
     """
     Create a USAePay charge based on the given invoice.
 
     :param invoice: models.Invoice object
-    :return: USAePay JSON response object. Example:
-                {
-
-                }
+    :param creds: Tuple of strings: (api_key, api_pin)
+    :return: USAePay JSON response object.
     """
     payload = {
         'command': 'check:sale',
@@ -131,16 +132,17 @@ def create_transaction(invoice):
         },
     }
 
-    r = api_request('/transactions', payload=payload)
+    r = api_request('/transactions', creds, payload=payload)
     r.raise_for_status()
     return r.json()
 
 
-def get_transaction_status(txn_key):
+def get_transaction_status(txn_key, creds):
     """
     Get the status of a past transaction.
 
     :param txn_key: Transaction key previously stored in the Invoice table
+    :param creds: Tuple of strings: (api_key, api_pin)
     :return: Python dictionary mapping of the USAePay JSON response object.
              Example response:
                 {
@@ -175,7 +177,7 @@ def get_transaction_status(txn_key):
                 }
     """
 
-    r = api_request('/transactions/' + txn_key, reqtype='GET')
+    r = api_request('/transactions/' + txn_key, creds, reqtype='GET')
     r.raise_for_status()
 
     return r.json()

@@ -1,0 +1,33 @@
+{% extends 'admin/master.html' %}
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block head %}
+    {{ super() }}
+    <link type="stylesheet" href="{{url_for('static', filename='bootstrap-datetimepicker.min.css')}}">
+{% endblock head %}
+
+{% block body %}
+    <div style="position: relative; width: 50%;" class="row-fluid">
+        <form class="form form-horizontal" method="POST" role="form" action="/generate-report/">
+            {{ form.hidden_tag() if form.hidden_tag }}
+            {{ wtf.form_errors(form, hiddens="only") }}
+            {{ wtf.form_field(form.from_date) }}
+            {{ wtf.form_field(form.to_date) }}
+            <button class="btn" type="submit">Submit</button>
+        </form>
+    </div>
+{% endblock body %}
+
+{% block tail_js %}
+    <script src="{{url_for('static', filename='moment.js')}}"></script>
+    <script src="{{url_for('static', filename='jquery-3.4.1.min.js')}}"></script>
+    <script src="{{url_for('static', filename='bootstrap.min.js')}}"></script>
+    <script src="{{url_for('static', filename='collapse.js')}}"></script>
+    <script src="{{url_for('static', filename='bootstrap-datetimepicker.min.js')}}"></script>
+    <script type="text/javascript">
+        $(function() {
+            $('#from_date').datetimepicker();
+            $('#to_date').datetimepicker();
+        });
+    </script>
+{% endblock tail_js %}

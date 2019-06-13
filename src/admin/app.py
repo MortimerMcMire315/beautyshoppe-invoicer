@@ -16,9 +16,10 @@ with nexudus-usaepay-gateway.  If not, see
 <https://www.gnu.org/licenses/>.
 """
 
-from flask import Flask, render_template, redirect
 import flask
+from flask import Flask, render_template, redirect, request
 
+from flask_bootstrap import Bootstrap
 from flask_apscheduler import APScheduler
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
@@ -28,9 +29,11 @@ from ..invoicer import invoicer
 from ..db import conn, models, loghandler
 from .. import config
 from . import auth
+from . import gencsv
 
 import traceback
 import sys
+import os
 import logging
 
 
@@ -84,6 +87,7 @@ def admin_setup(app):
     admin.add_view(MemberAdminView(models.Member, db_session))
     admin.add_view(AuthModelView(models.Invoice, db_session))
     admin.add_view(AuthModelView(models.Log, db_session))
+    admin.add_view(auth.ReportsView(name='Reports', endpoint='reports', url='/report'))
     return db_session
 
 
@@ -96,8 +100,19 @@ def app_setup(app, db_session):
 
     @app.route('/process-invoices/')
     def process_invoices():
-        invoicer.run()
+        invoicer.run(True)
         return flask.Response(flask.g.get('logqueue', ''), mimetype='text/plain')
+
+    @app.route('/generate-report/', methods=['POST'])
+    def generate_report():
+        if request.method == 'POST':
+            csvfile = gencsv.generate_csv(request.form["from_date"], 
+                                          request.form["to_date"])
+            return flask.send_file(csvfile.name, as_attachment=True, mimetype='text/csv', attachment_filename='report.csv')
+
+        @app.after_request
+        def cleanup(response):
+            os.close(csvfile)
 
     @app.teardown_request
     def teardown_request(*args, **kwargs):
@@ -131,6 +146,7 @@ def init():
     """Initialize application."""
     # Set up Flask app
     app = Flask(__name__)
+    Bootstrap(app)
     db_session = admin_setup(app)
 
     # Give the app a configuration
