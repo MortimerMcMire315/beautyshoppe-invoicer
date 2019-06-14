@@ -32,7 +32,7 @@ from .. import config
 from ..db import models, conn
 
 class MultipleResultsFoundException(Exception):
-    pass
+    """We tried to get a single record but multiple were found."""
 
 
 def get_records(url_part, payload, single=False):
@@ -41,9 +41,9 @@ def get_records(url_part, payload, single=False):
 
     :param url_part: Nexudus API URL - everything after "/api/".
     :param payload: GET variables to send along with API request
-    :param single: True if we should only have a single record. Throws an exception if more than one result is returned.
+    :param single: True if we should only have a single record. Throws an
+                   exception if more than one result is returned.
     :returns: Yields a batch of records (list of dicts).
-    :raises: TODO
     """
     url = config.NEXUDUS_API_URL + url_part
     creds = (config.NEXUDUS_EMAIL, config.NEXUDUS_PASS)
@@ -259,7 +259,6 @@ def add_or_overwrite_invoice(record, db_sess):
         invoice_to_add.nexudus_invoice_id = record["Id"]
         invoice_to_add.nexudus_user_id = record["CoworkerId"]
         invoice_to_add.nexudus_space_id = record["BusinessId"]
-        # TODO do this for real
         invoice_to_add.time_created = datetime.datetime.now()
         invoice_to_add.amount = float(record["TotalAmount"])
         invoice_to_add.finalized = False
@@ -314,8 +313,13 @@ def add_or_overwrite_member(record, db_sess):
     member_to_add.fullname = record["FullName"]
     member_to_add.billing_name = record["BillingName"] or record["FullName"]
     member_to_add.email = record["Email"]
+
+    # TODO Update to use custom fields for ACH data should go here. Will need
+    # to replace these dictionary keys with Custom1 and Custom2 or whatever
+    # custom fields are actually used.
     member_to_add.routing_number = record["BankBranch"]
     member_to_add.account_number = record["BankAccount"]
+
 
     def nstrip(s):
         """Return stripped string or None"""
