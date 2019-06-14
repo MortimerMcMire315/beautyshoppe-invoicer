@@ -132,7 +132,7 @@ def scheduler_setup(app):
 def log_setup(app, db_session):
     """Set up a database logger for our invoicer system."""
     # Set log level
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=config.LOGLEVEL)
     db_logger = logging.getLogger('invoicer_db')
     # Add custom log handler to log directly to DB
     db_logger.addHandler(loghandler.SQLALogHandler(db_session))

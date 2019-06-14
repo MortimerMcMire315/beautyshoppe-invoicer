@@ -33,19 +33,24 @@ manually_initiated=False
 
 def log_message(msg, level=logging.INFO):
     """
-    Log something to the database or to the web frontend.
+    Log something to the database and/or to the web frontend.
 
     :param msg: The string to log.
     :param level: debug, info, warning, error, critical
     """
     global manually_initiated
 
-    if manually_initiated:
-        logger = logging.getLogger('invoicer_ajax')
-    else:
-        logger = logging.getLogger('invoicer_db')
+    strippedmessage = msg
 
-    logger.log(level, msg)
+    if manually_initiated:
+        ajax_logger = logging.getLogger('invoicer_ajax')
+        ajax_logger.log(level, msg)
+    else:
+        strippedmessage = msg.replace('>>>','').strip()
+
+    # Always log to the DB
+    db_logger = logging.getLogger('invoicer_db')
+    db_logger.log(level, msg)
 
 
 def run(manual=False):
@@ -76,7 +81,6 @@ def run(manual=False):
         log_message(">>> Syncing member table...")
         nexudus.sync_member_table(sm, nexudus_space_id)
 
-        # TODO maybe clean up invoices that have been paid first
         log_message(">>> Getting unpaid invoices from Nexudus...")
         nexudus.sync_invoice_table(sm, nexudus_space_id)
 
@@ -207,7 +211,7 @@ def check_txn_statuses(sm, nexudus_space_id):
         all()
 
     if len(approved_invoices) == 0:
-        log_message("    No Approved, not-Settled transactions found.")
+        log_message("    No Approved, unsettled transactions found.")
 
     for invoice in approved_invoices:
         mark_transaction_status(invoice, db_sess, nexudus_space_id)
