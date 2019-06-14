@@ -46,7 +46,7 @@ class Config(object):
                 'id': 'invoice_transfer',
                 'func': invoicer.run,
                 'trigger': 'interval',
-                'seconds': 1000,
+                'seconds': config.SECONDS_BETWEEN_JOBS,
                 'max_instances': 1,
                 'coalesce': True
             }
@@ -72,6 +72,9 @@ def admin_setup(app):
     class MemberAdminView(AuthModelView):
         column_filters = ('nexudus_user_id', 'fullname', 'email')
 
+    class LogAdminView(AuthModelView):
+        column_filters = ('log_level', 'time_created')
+
     auth.init_login(db_session, app)
 
     # Set up admin front page
@@ -86,7 +89,7 @@ def admin_setup(app):
                   template_mode='bootstrap3')
     admin.add_view(MemberAdminView(models.Member, db_session))
     admin.add_view(AuthModelView(models.Invoice, db_session))
-    admin.add_view(AuthModelView(models.Log, db_session))
+    admin.add_view(LogAdminView(models.Log, db_session))
     admin.add_view(auth.ReportsView(name='Reports', endpoint='reports', url='/report'))
     return db_session
 

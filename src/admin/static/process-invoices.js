@@ -6,6 +6,7 @@ var Invoicer = {
 
     doProcess: function() {
         var self = this;
+        $('#processing-log').html('<p>Running...</p>');
         $.ajax({
             url: '/process-invoices/',
             success: function(res) {self.printLog(res);},

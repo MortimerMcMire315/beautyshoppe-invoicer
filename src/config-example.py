@@ -17,10 +17,10 @@ with nexudus-usaepay-gateway.  If not, see
 """
 
 """
-Rename this file to config.py and fill in each field.
+Rename this file to config.py and fill in each field as described.
 """
 
-import logging
+from logging import DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 # Credentials to our local database.
 DB_TYPE = "mysql"
@@ -70,4 +70,7 @@ PROCESS_AUTOMATICALLY = False
 FLASK_SECRET = b'\x00\x00\x00'
 
 # DEBUG, INFO, WARNING, ERROR, or CRITICAL
-LOGLEVEL = logging.DEBUG
+LOGLEVEL = WARNING
+
+# Wait this number of seconds before spawning a new invoice processing job.
+SECONDS_BETWEEN_JOBS = 3600

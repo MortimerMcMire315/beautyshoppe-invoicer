@@ -104,8 +104,8 @@ class LoginForm(form.Form):
         return authAPIUser(self.login.data, self.password.data)
 
 class ReportForm(form.Form):
-    from_date = fields.DateField('Searching for reports between', format='%Y-%m-%d')
-    to_date = fields.DateField('and', format='%Y-%m-%d')
+    from_date = fields.DateField('Searching for reports between', format='%Y/%m/%d %H:%M')
+    to_date = fields.DateField('and', format='%Y/%m/%d %H:%M')
 
 def authAPIUser(email, password):
     """

@@ -258,6 +258,7 @@ def add_or_overwrite_invoice(record, db_sess):
         invoice_to_add = models.Invoice()
         invoice_to_add.nexudus_invoice_id = record["Id"]
         invoice_to_add.nexudus_user_id = record["CoworkerId"]
+        invoice_to_add.nexudus_space_id = record["BusinessId"]
         # TODO do this for real
         invoice_to_add.time_created = datetime.datetime.now()
         invoice_to_add.amount = float(record["TotalAmount"])
@@ -361,7 +362,11 @@ def sync_table(sm, nexudus_space_id, sync_callback, payload, url_part, business_
 
     def callback(records):
         for record in records:
-            sync_callback(record, db_sess)
+            try:
+                sync_callback(record, db_sess)
+            except KeyError as e:
+                logger = logging.getLogger('invoicer_db')
+                logger.log(logging.ERROR, 'Attempted to access an invalid key for a Nexudus record! Error: ' + str(e))
 
     # It is important that we only grab coworkers from the spaces we actually
     # want to manage. If we don't do this, coworkers will be pulled from all

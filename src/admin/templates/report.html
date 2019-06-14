@@ -3,12 +3,15 @@
 
 {% block head %}
     {{ super() }}
-    <link type="stylesheet" href="{{url_for('static', filename='bootstrap-datetimepicker.min.css')}}">
+    <!--<link type="stylesheet" href="{{url_for('static', filename='bootstrap-datetimepicker.min.css')}}">-->
+    <link rel="stylesheet" href="{{url_for('static', filename='select2/select2.css')}}">
+    <link rel="stylesheet" href="{{url_for('static', filename='select2/select2-bootstrap3.css')}}">
+    <link rel="stylesheet" href="{{url_for('static', filename='bootstrap-daterangepicker/daterangepicker-bs3.css')}}">
 {% endblock head %}
 
 {% block body %}
     <div style="position: relative; width: 50%;" class="row-fluid">
-        <form class="form form-horizontal" method="POST" role="form" action="/generate-report/">
+        <form class="form form-horizontal" method="POST" role="form" action="/generate-report/" autocomplete="off">
             {{ form.hidden_tag() if form.hidden_tag }}
             {{ wtf.form_errors(form, hiddens="only") }}
             {{ wtf.form_field(form.from_date) }}
@@ -21,13 +24,32 @@
 {% block tail_js %}
     <script src="{{url_for('static', filename='moment.js')}}"></script>
     <script src="{{url_for('static', filename='jquery-3.4.1.min.js')}}"></script>
-    <script src="{{url_for('static', filename='bootstrap.min.js')}}"></script>
-    <script src="{{url_for('static', filename='collapse.js')}}"></script>
-    <script src="{{url_for('static', filename='bootstrap-datetimepicker.min.js')}}"></script>
+    <!--<script src="{{url_for('static', filename='bootstrap.min.js')}}"></script>-->
+    <!--<script src="{{url_for('static', filename='collapse.js')}}"></script>-->
+    <script src="{{url_for('static', filename='select2/select2.min.js')}}"></script>
+    <script src="{{url_for('static', filename='bootstrap-daterangepicker/daterangepicker.js')}}"></script>
     <script type="text/javascript">
         $(function() {
-            $('#from_date').datetimepicker();
-            $('#to_date').datetimepicker();
+            $('#from_date').daterangepicker({
+                singleDatePicker: true,
+                //timePicker: true,
+                //timePickerIncrement: 1,
+                //timePicker12Hour: false,
+                // startDate: moment().startOf('hour'),
+                locale: {
+                    format: 'MM/DD/YYYY'
+                }
+            });
+            $('#to_date').daterangepicker({
+                singleDatePicker: true,
+                //timePicker: true,
+                //timePickerIncrement: 1,
+                //timePicker12Hour: false,
+                // startDate: moment().startOf('hour'),
+                locale: {
+                    format: 'MM/DD/YYYY'
+                }
+            });
         });
     </script>
 {% endblock tail_js %}

@@ -29,7 +29,8 @@ from .. import config
 from ..db import conn, models
 from ..db.models import Invoice, Member
 
-manually_initiated=False
+manually_initiated = False
+
 
 def log_message(msg, level=logging.INFO):
     """
@@ -40,17 +41,16 @@ def log_message(msg, level=logging.INFO):
     """
     global manually_initiated
 
-    strippedmessage = msg
 
     if manually_initiated:
         ajax_logger = logging.getLogger('invoicer_ajax')
         ajax_logger.log(level, msg)
-    else:
-        strippedmessage = msg.replace('>>>','').strip()
 
-    # Always log to the DB
+
+    # Always log to the DB. Strip out the visual markers first.
+    strippedmessage = msg.replace('>>>', '').strip()
     db_logger = logging.getLogger('invoicer_db')
-    db_logger.log(level, msg)
+    db_logger.log(level, strippedmessage)
 
 
 def run(manual=False):
@@ -75,6 +75,7 @@ def run(manual=False):
     # Perform this entire process for each nexudus space that we want to
     # manage.
     for nexudus_space_id in config.NEXUDUS_SPACE_USAEPAY_MAP:
+        log_message("")
         log_message("For Nexudus space " + str(nexudus_space_id) + ":")
 
         # TODO maybe clean up members that are no longer active first
@@ -127,18 +128,20 @@ def charge_single_invoice(invoice, db_sess, nexudus_space_id):
     try:
         res = usaepay.create_transaction(invoice, creds)
         if res["result_code"] != usaepay.RESULT_APPROVED:
-            log_transaction_exception(res["result_code"], res["error"])
+            log_transaction_exception(res["error"], 
+                                      invoice.member.email)
 
         invoice.txn_key = res["key"]
-        invoice.txn_resultcode = usaepay.RESULT_APPROVED
-        invoice.txn_result = "Approved"
+        invoice.txn_resultcode = res["result_code"]
+        invoice.txn_result = res["result"]
+        db_sess.commit()
 
     except KeyError as e:
         log_message("Key %s not found in USAePay response!" % str(e),
                     logging.ERROR)
 
     except HTTPError as e:
-        log_message("CRITICAL: Request to USAePay failed. Message: " + str(e),
+        log_message("Charge request to USAePay failed. Message: " + str(e),
                     logging.ERROR)
 
 
@@ -177,7 +180,11 @@ def charge_unpaid_invoices(sm, nexudus_space_id):
         filter(
             or_(
                 Invoice.txn_resultcode == None,
-                Invoice.txn_resultcode == ''
+                Invoice.txn_resultcode == '',
+                # We'll try invoices with declined/error results again, so the
+                # manager keeps seeing an error message.
+                Invoice.txn_resultcode == usaepay.RESULT_DECLINED,
+                Invoice.txn_resultcode == usaepay.RESULT_ERROR
             )
         ).all()
 
@@ -207,7 +214,12 @@ def check_txn_statuses(sm, nexudus_space_id):
         filter(Invoice.nexudus_space_id == nexudus_space_id).\
         filter(Invoice.member.has(process_automatically=True)).\
         filter_by(txn_resultcode=usaepay.RESULT_APPROVED).\
-        filter(Invoice.txn_statuscode != usaepay.STATUS_SETTLED).\
+        filter(
+            or_(
+                Invoice.txn_statuscode != usaepay.STATUS_SETTLED,
+                Invoice.txn_statuscode == None
+            )
+        ).\
         all()
 
     if len(approved_invoices) == 0:
@@ -217,13 +229,17 @@ def check_txn_statuses(sm, nexudus_space_id):
         mark_transaction_status(invoice, db_sess, nexudus_space_id)
 
 
-def log_transaction_exception(result_code, result):
+def log_transaction_exception(result, email):
     """
     Mark transaction status and log the error.
-    TODO
-    """
-    print(result)
 
+    :param result: USAePay transaction result message
+    :param email: User's email address
+    """
+    log_message("    Error processing invoice for user %s: %s"
+                % (email, result),
+                logging.ERROR
+               )
 
 def finalize_invoice(invoice, db_sess):
     """

@@ -26,8 +26,8 @@ from ..db import conn
 from ..db.models import Log
 
 def to_datetime(datestr):
-    date = datestr.replace(' 0',' ')
-    t = datetime.datetime.strptime(date, "%m/%d/%Y %I:%M %p")
+    print(datestr)
+    t = datetime.datetime.strptime(datestr, "%m/%d/%Y") #%I:%M %p")
     return t
 
 
@@ -43,9 +43,6 @@ def generate_csv(from_date, to_date):
 
     csvfile = tempfile.NamedTemporaryFile('w', newline='')
     writer = csv.writer(csvfile)
-
-    print("yo!")
-    print(loglines)
 
     writer.writerow(['Timestamp','Level', 'Message'])
     for l in loglines:
