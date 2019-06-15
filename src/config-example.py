@@ -26,6 +26,9 @@ from logging import DEBUG, INFO, WARNING, ERROR, CRITICAL
 DB_TYPE = "mysql"
 DB_HOST = "example.db"
 DB_PORT = 3306
+
+# These values should be the same as the values listed in the .env file one
+# directory above this file.
 DB_USER = "user"
 DB_PASS = "pass"
 DB_NAME = "db"
@@ -35,15 +38,15 @@ DB_NAME = "db"
 NEXUDUS_EMAIL = "email@example.com"
 NEXUDUS_PASS = "password"
 
-# Don't change unless Nexudus actually changes the API URL, which they
-# shouldn't.
+# Don't change these unless Nexudus or USAePay actually changes their API URL.
 NEXUDUS_API_URL = "https://spaces.nexudus.com/api/"
+USAEPAY_API_URL = "https://sandbox.usaepay.com/api/v2"
 
-# Map of spaces to manage and corresponding USAePay API keys. By default, when
-# we access the Nexudus API, we get data from all spaces managed by the API
-# account. Use this list to restrict to certain spaces.
-#
-# To find your space ID, log into spaces.nexudus.com, manage a space, and check
+# Map of spaces to manage and corresponding USAePay API keys. We do it this way
+# because the Beauty Shoppe uses different USAePay accounts for different
+# spaces, but one Nexudus account manages all of the spaces.
+
+# To find a space ID, log into spaces.nexudus.com, manage a space, and check
 # the page source (CTRL-U in Chrome). then CTRL-F for "businessId".  The ID
 # listed in the javascript is the ID for the space that you're currently
 # managing.
@@ -58,8 +61,6 @@ NEXUDUS_SPACE_USAEPAY_MAP = {
         "api_pin": "123456"
     }
 }
-
-USAEPAY_API_URL = "https://sandbox.usaepay.com/api/v2"
 
 # By default, should members with existing ACH info in Nexudus have their
 # invoices automatically processed?
