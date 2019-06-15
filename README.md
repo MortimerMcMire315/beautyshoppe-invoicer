@@ -17,7 +17,7 @@ Then, click the "Process Invoices" button to sync the member and invoice tables.
 #### Sync member table
 Queries Nexudus for this space's members, and loads them into the local Member table. Each member has a "Process Automatically" flag, which controls whether this system will pay attention to their unpaid invoices. By default, this is set to False for all newly-loaded members. If the `PROCESS_AUTOMATICALLY` constant is set to `True` in the configuration file, each member's "Process Automatically" flag will be set to True **if** there is ACH data in their Routing Number and Account Number fields in their Nexudus member profile. 
 
-To modify a member's Process Automatically field:
+To modify a member's Process Automatically field after the member table has been synchronized:
 * Navigate to the Member page
 * Click the pencil icon next to a member row (You can filter the table using the "Add filter" button)
 * Click the big checkbox to the right of "Process Automatically" on the edit page.
