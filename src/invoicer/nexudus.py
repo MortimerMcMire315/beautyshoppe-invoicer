@@ -56,7 +56,6 @@ def get_records(url_part, payload, single=False):
         params["page"] = current_page
         r = requests.get(url, params=params, auth=creds)
 
-        # TODO handle request errors
         res = r.json()
 
         if single:

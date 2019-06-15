@@ -85,7 +85,7 @@ def run(manual=False):
         log_message(">>> Getting unpaid invoices from Nexudus...")
         nexudus.sync_invoice_table(sm, nexudus_space_id)
 
-        log_message(">>> Checking for new transactions to send to USAePay...")
+        log_message(">>> Charging unpaid invoices to USAePay...")
         charge_unpaid_invoices(sm, nexudus_space_id)
 
         log_message(">>> Checking for settled transactions...")

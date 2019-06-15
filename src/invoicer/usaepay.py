@@ -84,7 +84,7 @@ def api_request(api_url, creds, payload=None, reqtype='POST'):
     :param api_url: URL fragment (e.g. '/transactions')
     :param creds: Tuple of strings: (api_key, api_pin)
     :param payload: Data to send in JSON format
-    :return: TODO
+    :return: API response JSON
     """
     apikey = creds[0]
     apipin = creds[1]
