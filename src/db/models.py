@@ -30,7 +30,7 @@ class Member(Base):
 
     __tablename__ = 'member'
     id = Column(Integer, primary_key=True)
-    nexudus_user_id = Column(BigInteger)
+    nexudus_user_id = Column(BigInteger, index=True)
     fullname = Column(Text)
     billing_name = Column(Text)
     email = Column(Text)
